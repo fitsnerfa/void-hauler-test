@@ -1,0 +1,3683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VOID HAULER v1.1 — Mining &amp; Commerce</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg:#05070c;
+    --panel:#0b1220;
+    --panel-edge:#1c2a3d;
+    --cyan:#4fe0d0;
+    --cyan-dim:#245b56;
+    --amber:#f2a154;
+    --danger:#e0546b;
+    --iron:#9199a6;
+    --copper:#d68a52;
+    --silver:#dfe6ec;
+    --gold:#eecb6a;
+    --platinum:#8fd0f2;
+    --crystal:#d98cf0;
+    --text:#dbe6ea;
+    --text-dim:#7d8fa0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:'Chakra Petch',sans-serif;color:var(--text);}
+  #game-root{position:relative;width:100%;height:100vh;}
+  canvas{display:block;background:var(--bg);}
+
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* ---------- HUD ---------- */
+  .hud{position:absolute;pointer-events:none;z-index:5;}
+  #hud-top-left{top:14px;left:14px;width:300px;}
+  #hud-top-right{top:14px;right:14px;width:230px;text-align:right;}
+  #hud-bottom-center{bottom:16px;left:50%;transform:translateX(-50%);text-align:center;}
+  #hud-bottom-left{bottom:14px;left:14px;}
+  #hud-bottom-right{bottom:14px;right:14px;width:160px;}
+  #radar{display:block;margin:0 auto;background:#050a12;border:1px solid var(--panel-edge);border-radius:50%;}
+
+  .panel{
+    background:linear-gradient(180deg, rgba(11,18,32,.92), rgba(8,13,22,.92));
+    border:1px solid var(--panel-edge);
+    border-radius:3px;
+    padding:10px 12px;
+    box-shadow:0 0 0 1px rgba(79,224,208,.05) inset, 0 4px 14px rgba(0,0,0,.4);
+  }
+  .label-row{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;
+    letter-spacing:.08em;color:var(--text-dim);text-transform:uppercase;margin-bottom:3px;}
+  .barwrap{height:9px;background:#131d2b;border:1px solid var(--panel-edge);border-radius:2px;
+    overflow:hidden;margin-bottom:9px;}
+  .bar{height:100%;transition:width .25s ease;}
+  .bar.hull{background:linear-gradient(90deg,#e0546b,#f2a154);}
+  .bar.cargo{background:linear-gradient(90deg,#245b56,#4fe0d0);}
+  .bar.energy{background:linear-gradient(90deg,#2a4a8f,#8fd0f2);}
+  .bar.energy.low{background:linear-gradient(90deg,#7a2030,#e0546b);animation:pulse 1s infinite;}
+  .bar.energy.charging{box-shadow:0 0 8px rgba(143,208,242,.9);}
+  .bar.shield{background:linear-gradient(90deg,#1c3a52,#8fd0f2);}
+  .bar.xp{background:linear-gradient(90deg,#8fd0f2,#4fe0d0);}
+  .credits{font-size:20px;font-weight:700;color:var(--amber);letter-spacing:.03em;}
+  .credits .sym{color:var(--text-dim);font-size:13px;margin-right:4px;}
+  .level-badge{display:inline-block;background:var(--cyan-dim);color:var(--cyan);
+    border:1px solid var(--cyan);border-radius:2px;padding:1px 6px;font-size:11px;margin-left:6px;}
+
+  .crew-card{padding:6px 8px;margin-bottom:6px;border:1px solid var(--panel-edge);border-radius:3px;
+    background:rgba(255,255,255,.02);}
+  .crew-card .name{font-size:12px;font-weight:600;color:var(--text);}
+  .crew-card .role{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;}
+  .crew-card .lvl{color:var(--cyan);font-size:10px;}
+  .crew-mini-bar{height:4px;background:#131d2b;border-radius:2px;overflow:hidden;margin-top:3px;}
+  .crew-mini-bar .fill{height:100%;background:var(--cyan);}
+  .empty-slot{padding:8px;text-align:center;font-size:11px;color:var(--text-dim);
+    border:1px dashed var(--panel-edge);border-radius:3px;margin-bottom:6px;}
+
+  #prompt{
+    background:rgba(11,18,32,.95);border:1px solid var(--cyan);color:var(--cyan);
+    padding:8px 18px;border-radius:3px;font-size:13px;letter-spacing:.04em;
+    text-transform:uppercase;animation:pulse 1.6s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.55;}}
+
+  #toast-wrap{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:6;
+    display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;}
+  .toast{background:rgba(11,18,32,.92);border:1px solid var(--panel-edge);border-left:3px solid var(--cyan);
+    padding:6px 14px;border-radius:2px;font-size:12px;opacity:0;transform:translateY(-6px);
+    animation:toastin .35s forwards, toastout .4s forwards 2.1s;}
+  .toast.levelup{border-left-color:var(--gold);color:var(--gold);}
+  .toast.warn{border-left-color:var(--danger);color:var(--danger);}
+  @keyframes toastin{to{opacity:1;transform:translateY(0);}}
+  @keyframes toastout{to{opacity:0;transform:translateY(-6px);}}
+
+  .controls-hint{font-size:11px;color:var(--text-dim);letter-spacing:.03em;line-height:1.6;}
+  .controls-hint b{color:var(--cyan);}
+
+  /* ---------- Station Overlay ---------- */
+  #station-overlay{position:absolute;inset:0;background:rgba(3,5,9,.86);z-index:10;
+    display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
+  #station-overlay.open{display:flex;}
+  #station-panel{width:min(760px,92vw);max-height:88vh;overflow-y:auto;
+    background:linear-gradient(180deg,#0d1522,#080d16);border:1px solid var(--panel-edge);
+    border-radius:4px;box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(79,224,208,.06) inset;}
+  #station-panel::-webkit-scrollbar{width:8px;}
+  #station-panel::-webkit-scrollbar-thumb{background:var(--panel-edge);border-radius:4px;}
+  #outpost-overlay{position:absolute;inset:0;background:rgba(3,5,9,.86);z-index:10;
+    display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
+  #outpost-overlay.open{display:flex;}
+  #outpost-panel{width:min(620px,92vw);max-height:88vh;overflow-y:auto;
+    background:linear-gradient(180deg,#1a140d,#120d08);border:1px solid #4a3220;
+    border-radius:4px;box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(242,161,84,.08) inset;}
+  #outpost-panel::-webkit-scrollbar{width:8px;}
+  #outpost-panel::-webkit-scrollbar-thumb{background:#4a3220;border-radius:4px;}
+  #outpost-panel .station-head{border-bottom:1px solid #4a3220;}
+  #manifest-overlay{position:absolute;inset:0;background:rgba(3,5,9,.75);z-index:11;
+    display:none;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
+  #manifest-overlay.open{display:flex;}
+  #manifest-panel{width:min(480px,92vw);max-height:80vh;overflow-y:auto;
+    background:linear-gradient(180deg,#0d1522,#080d16);border:1px solid var(--panel-edge);
+    border-radius:4px;box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(79,224,208,.06) inset;}
+  #manifest-panel::-webkit-scrollbar{width:8px;}
+  #manifest-panel::-webkit-scrollbar-thumb{background:var(--panel-edge);border-radius:4px;}
+  .station-head{padding:18px 24px;border-bottom:1px solid var(--panel-edge);display:flex;
+    justify-content:space-between;align-items:center;}
+  .station-head h1{font-size:20px;letter-spacing:.06em;margin:0;color:var(--cyan);text-transform:uppercase;}
+  .station-head .sub{font-size:11px;color:var(--text-dim);letter-spacing:.05em;margin-top:2px;}
+  .close-btn{cursor:pointer;pointer-events:auto;background:none;border:1px solid var(--panel-edge);
+    color:var(--text-dim);width:30px;height:30px;border-radius:3px;font-size:16px;}
+  .close-btn:hover{border-color:var(--danger);color:var(--danger);}
+
+  .tabs{display:flex;gap:2px;padding:0 24px;border-bottom:1px solid var(--panel-edge);pointer-events:auto;}
+  .tab{padding:10px 16px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim);
+    cursor:pointer;border-bottom:2px solid transparent;}
+  .tab.active{color:var(--cyan);border-bottom-color:var(--cyan);}
+  .tab-content{padding:20px 24px;display:none;pointer-events:auto;}
+  .tab-content.active{display:block;}
+
+  .cargo-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+    border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;}
+  .cargo-row:last-child{border-bottom:none;}
+  .swatch{width:11px;height:11px;border-radius:2px;display:inline-block;margin-right:9px;}
+  .cargo-name{display:flex;align-items:center;}
+  .cargo-qty{color:var(--text-dim);margin:0 10px;}
+  .cargo-val{color:var(--amber);font-family:'JetBrains Mono',monospace;min-width:70px;text-align:right;}
+  .sell-btn{margin-top:16px;width:100%;padding:12px;background:var(--cyan-dim);border:1px solid var(--cyan);
+    color:var(--cyan);font-family:'Chakra Petch',sans-serif;font-size:14px;letter-spacing:.06em;
+    text-transform:uppercase;border-radius:3px;cursor:pointer;}
+  .sell-btn:hover{background:var(--cyan);color:#031012;}
+  .sell-btn:disabled{opacity:.35;cursor:not-allowed;background:none;color:var(--text-dim);}
+  .empty-note{color:var(--text-dim);font-size:13px;padding:20px 0;text-align:center;}
+
+  .upgrade-card{display:flex;justify-content:space-between;align-items:center;padding:14px;
+    border:1px solid var(--panel-edge);border-radius:3px;margin-bottom:10px;background:rgba(255,255,255,.015);}
+  .upgrade-info .u-name{font-size:14px;font-weight:600;}
+  .upgrade-info .u-desc{font-size:11px;color:var(--text-dim);margin-top:2px;}
+  .upgrade-info .u-lvl{font-size:11px;color:var(--cyan);margin-top:4px;}
+  .upgrade-btn{padding:9px 16px;background:none;border:1px solid var(--amber);color:var(--amber);
+    font-family:'JetBrains Mono',monospace;font-size:12px;border-radius:3px;cursor:pointer;white-space:nowrap;}
+  .upgrade-btn:hover{background:var(--amber);color:#241305;}
+  .upgrade-btn:disabled{opacity:.3;cursor:not-allowed;background:none;color:var(--text-dim);border-color:var(--panel-edge);}
+
+  .crew-hire-card{border:1px solid var(--panel-edge);border-radius:3px;padding:14px;margin-bottom:10px;
+    display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.015);}
+  .crew-detail .c-name{font-size:14px;font-weight:600;}
+  .crew-detail .c-role{font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+  .crew-detail .c-perk{font-size:11px;color:var(--text-dim);margin-top:4px;}
+  .hire-btn{padding:9px 16px;background:none;border:1px solid var(--cyan);color:var(--cyan);
+    font-family:'JetBrains Mono',monospace;font-size:12px;border-radius:3px;cursor:pointer;white-space:nowrap;}
+  .hire-btn:hover{background:var(--cyan);color:#031012;}
+  .hire-btn:disabled{opacity:.3;cursor:not-allowed;background:none;color:var(--text-dim);border-color:var(--panel-edge);}
+  .crew-list-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;
+    border-bottom:1px solid rgba(255,255,255,.05);}
+
+  #start-screen{position:absolute;inset:0;background:var(--bg);z-index:20;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+  #start-screen h1{font-size:38px;letter-spacing:.12em;color:var(--cyan);margin:0 0 6px;
+    text-shadow:0 0 24px rgba(79,224,208,.4);}
+  #start-screen p{color:var(--text-dim);font-size:13px;letter-spacing:.04em;max-width:440px;line-height:1.7;margin:0 0 26px;}
+  #start-btn{padding:14px 40px;background:var(--cyan-dim);border:1px solid var(--cyan);color:var(--cyan);
+    font-size:15px;letter-spacing:.08em;text-transform:uppercase;border-radius:3px;cursor:pointer;
+    font-family:'Chakra Petch',sans-serif;}
+  #start-btn:hover{background:var(--cyan);color:#031012;}
+  #reset-link{margin-top:16px;font-size:11px;color:var(--text-dim);cursor:pointer;text-decoration:underline;}
+</style>
+</head>
+<body>
+<div id="game-root">
+  <canvas id="game"></canvas>
+
+  <div id="hud-top-left" class="hud panel">
+    <div class="label-row"><span>Hull</span><span class="mono" id="hull-txt">100/100</span></div>
+    <div class="barwrap"><div class="bar hull" id="hull-bar" style="width:100%"></div></div>
+    <div class="label-row" id="shield-row" style="display:none;"><span>Shield</span><span class="mono" id="shield-txt">0/0</span></div>
+    <div class="barwrap" id="shield-barwrap" style="display:none;"><div class="bar shield" id="shield-bar" style="width:0%"></div></div>
+    <div class="label-row"><span>Energy</span><span class="mono" id="energy-txt">100/100</span></div>
+    <div class="barwrap"><div class="bar energy" id="energy-bar" style="width:100%"></div></div>
+    <div class="label-row"><span>Cargo</span><span class="mono" id="cargo-txt">0/20</span></div>
+    <div class="barwrap"><div class="bar cargo" id="cargo-bar" style="width:0%"></div></div>
+    <div id="gas-tank-row" style="display:none;">
+      <div class="label-row"><span>Gas Tank</span><span class="mono" id="gas-tank-txt">0/20</span></div>
+      <div class="barwrap"><div class="bar" id="gas-tank-bar" style="width:0%;background:linear-gradient(90deg,#2a6b4f,#8fe3a0);"></div></div>
+    </div>
+    <div class="label-row"><span>Captain Lv<span class="level-badge" id="lvl-badge">1</span></span><span class="mono" id="xp-txt">0/50</span></div>
+    <div class="barwrap"><div class="bar xp" id="xp-bar" style="width:0%"></div></div>
+    <div class="credits"><span class="sym">CR</span><span id="credits-txt">0</span></div>
+    <div id="frigate-bounty-row" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--panel-edge);">
+      <div class="label-row"><span>Frigate Bounty</span><span class="mono" id="frigate-bounty-txt">0/15</span></div>
+      <div class="barwrap" style="margin-bottom:0;"><div class="bar" id="frigate-bounty-bar" style="width:0%;background:linear-gradient(90deg,#7a2030,#ff6a3d);"></div></div>
+    </div>
+  </div>
+
+  <div id="hud-target-lock" class="hud panel" style="top:14px;left:50%;transform:translateX(-50%);display:none;min-width:200px;text-align:center;">
+    <div class="label-row" id="target-lock-label" style="justify-content:center;margin-bottom:5px;">Target</div>
+    <div class="barwrap" style="margin-bottom:0;"><div class="bar" id="target-lock-bar" style="width:100%;background:linear-gradient(90deg,#7a2030,#e0546b);"></div></div>
+    <div id="target-lock-proximity" class="mono" style="font-size:10px;margin-top:5px;color:var(--text-dim);">Neutral range</div>
+  </div>
+
+  <div id="sound-toggle" style="position:absolute;top:14px;right:262px;z-index:6;pointer-events:auto;">
+    <button id="sound-toggle-btn" onclick="toggleMute()" style="background:rgba(11,18,32,.92);border:1px solid var(--panel-edge);color:var(--cyan);width:38px;height:38px;border-radius:3px;font-size:15px;cursor:pointer;">🔊</button>
+  </div>
+
+  <div id="hud-top-right" class="hud panel" style="text-align:left;">
+    <div class="label-row" style="margin-bottom:8px;">Crew</div>
+    <div id="crew-panel"></div>
+  </div>
+
+  <div id="hud-bottom-center" class="hud">
+    <div id="prompt" style="display:none;"></div>
+  </div>
+
+  <div id="hud-bottom-left" class="hud panel">
+    <div class="controls-hint">
+      <b>W/↑</b> thrust &nbsp; <b>A/D</b> turn &nbsp; <b>SPACE</b> fire laser<br>
+      <b>E</b> dock at station &nbsp; <b>I</b> cargo manifest &nbsp; <b>ESC</b> close menu<br>
+      <span id="tractor-hint" style="display:none;"><b>SHIFT/CTRL</b> <span id="tractor-hint-txt">tractor beam</span></span>
+      <span id="missile-hint" style="display:none;"><br><b>Z</b> fire missile <span id="missile-ammo-txt" class="mono">(0)</span></span>
+    </div>
+  </div>
+
+  <div id="hud-bottom-right" class="hud panel" style="text-align:center;">
+    <div class="label-row" style="margin-bottom:6px;justify-content:center;">Radar</div>
+    <canvas id="radar" width="140" height="140"></canvas>
+    <div class="mono" id="radar-dist" style="font-size:11px;color:var(--cyan);margin-top:6px;">--</div>
+  </div>
+
+  <div id="toast-wrap"></div>
+
+  <div id="station-overlay">
+    <div id="station-panel">
+      <div class="station-head">
+        <div>
+          <h1>Ceres Trade Anchorage</h1>
+          <div class="sub">Docked · all systems nominal</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div class="credits" style="font-size:18px;"><span class="sym">CR</span><span id="station-credits-txt">0</span></div>
+          <button class="close-btn" onclick="closeStation()">✕</button>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" data-tab="sell" onclick="switchTab('sell')">Sell Cargo</div>
+        <div class="tab" data-tab="upgrades" onclick="switchTab('upgrades')">Ship Upgrades</div>
+        <div class="tab" data-tab="crew" onclick="switchTab('crew')">Crew Quarters</div>
+        <div class="tab" data-tab="faction" onclick="switchTab('faction')">Faction</div>
+      </div>
+      <div class="tab-content active" id="tab-sell"></div>
+      <div class="tab-content" id="tab-upgrades"></div>
+      <div class="tab-content" id="tab-crew"></div>
+      <div class="tab-content" id="tab-faction"></div>
+    </div>
+  </div>
+
+  <div id="outpost-overlay">
+    <div id="outpost-panel">
+      <div class="station-head">
+        <div>
+          <h1 style="color:var(--amber);">Black Market Relay</h1>
+          <div class="sub">Docked · unlicensed fence, deep zone</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div class="credits" style="font-size:18px;"><span class="sym">CR</span><span id="outpost-credits-txt">0</span></div>
+          <button class="close-btn" onclick="closeOutpost()">✕</button>
+        </div>
+      </div>
+      <div style="padding:20px 24px;">
+        <div class="label-row" style="margin-bottom:8px;">Sell Cargo <span style="color:var(--text-dim);text-transform:none;">(fence rates — 20% under market)</span></div>
+        <div id="outpost-sell"></div>
+        <div id="outpost-missiles" style="margin-top:20px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="manifest-overlay">
+    <div id="manifest-panel">
+      <div class="station-head">
+        <div>
+          <h1>Cargo Manifest</h1>
+          <div class="sub">Hold Status</div>
+        </div>
+        <button class="close-btn" onclick="closeManifest()">✕</button>
+      </div>
+      <div style="padding:20px 24px;">
+        <div id="manifest-rows"></div>
+        <div id="manifest-total" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--panel-edge);font-size:13px;color:var(--text-dim);"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="start-screen">
+    <h1>VOID HAULER</h1>
+    <div style="color:var(--text-dim);font-size:11px;letter-spacing:.15em;margin:-4px 0 18px;font-family:'JetBrains Mono',monospace;">v1.1</div>
+    <p>Every asteroid starts out as plain gray rock — composition unknown. Blast one down through its fragments and you won't know what you're actually hauling until the smallest pieces crack open, so a single big rock might hide a mix of common ore and something far more valuable. Scoop up what spills out and haul it back to Ceres Anchorage to sell. Watch out for pirates hunting your cargo hold — fight them off or outrun them. Reinvest in your ship, hire crew, and build a mining operation from a single beat-up hauler.</p>
+    <button id="start-btn" onclick="startGame()">Launch</button>
+    <div id="reset-link" onclick="resetSave()">reset save data</div>
+  </div>
+</div>
+
+<script>
+/* ============================= CONFIG ============================= */
+const WORLD = 5000;
+const STATION = {x: 2500, y: 2500, dockRadius: 170};
+const STORAGE_KEY = 'ore:save';
+
+const MATERIALS = {
+  iron:      {name:'Iron Ore',       color:'#9199a6', price:5,     weight:38, symbol:'Fe', cargoWeight:1},
+  copper:    {name:'Copper Ore',     color:'#d68a52', price:13,    weight:27, symbol:'Cu', cargoWeight:1},
+  silver:    {name:'Silver Ore',     color:'#dfe6ec', price:32,    weight:16, symbol:'Ag', cargoWeight:1},
+  gold:      {name:'Gold Ore',       color:'#eecb6a', price:78,    weight:10, symbol:'Au', cargoWeight:1},
+  platinum:  {name:'Platinum Ore',   color:'#8fd0f2', price:155,   weight:6,  symbol:'Pt', cargoWeight:1},
+  crystal:   {name:'Quantum Crystal',color:'#d98cf0', price:420,   weight:3,  symbol:'Qx', cargoWeight:1},
+  ruby:      {name:'Ruby',           color:'#ff4d6a', price:260,   weight:2,  symbol:'Ru', cargoWeight:1, gem:true},
+  sapphire:  {name:'Sapphire',       color:'#4d7fff', price:260,   weight:2,  symbol:'Sa', cargoWeight:1, gem:true},
+  diamond:   {name:'Diamond',        color:'#e8fbff', price:650,   weight:1,  symbol:'Di', cargoWeight:1, gem:true},
+  darkmatter:{name:'Dark Matter',    color:'#a855f7', price:20000, weight:0,  symbol:'Dm', cargoWeight:100},
+  // refined ingots — never found on asteroids, only produced by smelting raw ore at 10:1
+  ingot_iron:    {name:'Iron Ingot',     color:'#b7bfc9', price:55,   weight:0, symbol:'Fe', cargoWeight:1, ingot:true, refines:'iron'},
+  ingot_copper:  {name:'Copper Ingot',   color:'#e8a877', price:143,  weight:0, symbol:'Cu', cargoWeight:1, ingot:true, refines:'copper'},
+  ingot_silver:  {name:'Silver Ingot',   color:'#f2f7fb', price:352,  weight:0, symbol:'Ag', cargoWeight:1, ingot:true, refines:'silver'},
+  ingot_gold:    {name:'Gold Ingot',     color:'#ffdd8a', price:858,  weight:0, symbol:'Au', cargoWeight:1, ingot:true, refines:'gold'},
+  ingot_platinum:{name:'Platinum Ingot', color:'#b3e2fa', price:1705, weight:0, symbol:'Pt', cargoWeight:1, ingot:true, refines:'platinum'},
+  // gases — collected from gas clouds in the Nebula zone via Ram Scoop, never found on asteroids
+  hydrogen: {name:'Hydrogen Gas', color:'#7ec8e3', price:4,   weight:0, symbol:'H',   cargoWeight:1, gas:true},
+  helium:   {name:'Helium Gas',   color:'#ffe9a8', price:9,   weight:0, symbol:'He',  cargoWeight:1, gas:true},
+  nitrogen: {name:'Nitrogen Gas', color:'#9bdcff', price:22,  weight:0, symbol:'N',   cargoWeight:1, gas:true},
+  methane:  {name:'Methane Gas',  color:'#8fe3a0', price:45,  weight:0, symbol:'CH4', cargoWeight:1, gas:true},
+  neon:     {name:'Neon Gas',     color:'#ff8fd1', price:180, weight:0, symbol:'Ne',  cargoWeight:1, gas:true},
+  xenon:    {name:'Xenon Gas',    color:'#c9a6ff', price:500, weight:0, symbol:'Xe',  cargoWeight:1, gas:true},
+  // salvage — dropped by destroyed Corvettes, not found on asteroids; use TBD
+  scrap_metal: {name:'Scrap Metal', color:'#9199a6', price:90, weight:0, symbol:'Sc', cargoWeight:1, salvage:true},
+};
+const MAT_KEYS = Object.keys(MATERIALS);
+const MINEABLE_KEYS = MAT_KEYS.filter(k=>k!=='darkmatter' && !MATERIALS[k].ingot && !MATERIALS[k].gas && !MATERIALS[k].salvage); // dark matter, ingots, gases, and salvage never roll through the asteroid pool
+const GAS_KEYS = MAT_KEYS.filter(k=>MATERIALS[k].gas);
+const GAS_TOTAL_WEIGHT_MAP = {hydrogen:38, helium:27, nitrogen:16, methane:10, neon:6, xenon:3};
+const GAS_TOTAL_WEIGHT = GAS_KEYS.reduce((s,k)=>s+(GAS_TOTAL_WEIGHT_MAP[k]||1),0);
+function pickGas(){
+  let r = Math.random()*GAS_TOTAL_WEIGHT;
+  for(const k of GAS_KEYS){ r -= (GAS_TOTAL_WEIGHT_MAP[k]||1); if(r<=0) return k; }
+  return 'hydrogen';
+}
+const TOTAL_WEIGHT = MINEABLE_KEYS.reduce((s,k)=>s+MATERIALS[k].weight,0);
+
+const TIER_RADIUS = [46, 27, 14];
+const TIER_HP     = [34, 17, 9];
+const DARKMATTER_RADIUS = [72, 42, 22];
+const DARKMATTER_HP     = [10000, 5000, 2500];
+
+
+const ROLES = {
+  miner:  {name:'Mining Officer',    desc:'+laser damage', perkPer:6},
+  nav:    {name:'Navigator',         desc:'+ship speed & turn rate', perkPer:6},
+  quarter:{name:'Quartermaster',     desc:'+cargo capacity', perkPer:6},
+  weapons:{name:'Weapons Specialist',desc:'+missile damage & faster reload', perkPer:6},
+  metallurgist:{name:'Metallurgist', desc:'+ingot sale value', perkPer:6},
+  gastech:{name:'Gas Engineer',      desc:'+ram scoop collection volume', perkPer:6},
+};
+const MAX_CREW = 6;
+const CREW_NAME_POOL = ['Reyes','Okonkwo','Vance','Iyer','Nakamura','Petrov','Alavi','Marsh','Dubois','Kowalski','Osei','Lindqvist'];
+const SMELTER_UNLOCK_LEVEL = 6;
+const SMELTER_COST = 3200;
+const SMELT_RATIO = 10; // raw ore units consumed per ingot produced
+const SMELTABLE_KEYS = ['iron','copper','silver','gold','platinum'];
+
+const PIRATE_HP_BASE = 38;
+const PIRATE_SPEED = 130;
+const PIRATE_PATROL_SPEED = 55;
+const PIRATE_DETECT_RANGE = 620;
+const PIRATE_FIRE_RANGE = 340;
+const PIRATE_DPS = 7;
+const PIRATE_CONTACT_RANGE = 32;
+const PIRATE_STEAL_FRACTION = 0.4;
+const PIRATE_BOUNTY_MIN = 40, PIRATE_BOUNTY_MAX = 110;
+function pirateTargetCount(){ return Math.min(3 + Math.floor(player.level/3), 7); }
+
+const FACTION_UNLOCK_LEVEL = 3;
+const FACTION_RANKS = [
+  {name:'Unaffiliated',        threshold:0},
+  {name:'Associate',           threshold:150},
+  {name:'Trusted Contractor',  threshold:400},
+  {name:'Veteran Partner',     threshold:900},
+  {name:'Elite Operative',     threshold:2000},
+  {name:'Legendary Benefactor',threshold:4500},
+];
+const FACTION_PERKS = [
+  {key:'discountLicense', name:'Trade License', rankReq:1, fpCost:150,
+    desc:'Permanent 10% discount on every ship upgrade you buy from here on.'},
+  {key:'tractorOvercharge', name:'Tractor Overcharge Clearance', rankReq:2, fpCost:300,
+    desc:'Raises your Tractor Beam upgrade cap from level 4 to level 6.'},
+  {key:'shieldOvercharge', name:'Shield Overcharge Clearance', rankReq:2, fpCost:300,
+    desc:'Raises your Deflector Shield upgrade cap from level 4 to level 6.'},
+  {key:'darkMatterCharts', name:'Deep Space Charts', rankReq:3, fpCost:500,
+    desc:'Permanently reveals both Dark Matter deposits on your radar, no matter the distance.'},
+  {key:'escortContract', name:'Escort Contract', rankReq:4, fpCost:900,
+    desc:'A faction gunship joins you permanently, trailing your ship and automatically engaging any pirate that gets close.'},
+];
+function factionRankIndex(){
+  let idx = 0;
+  for(let i=0;i<FACTION_RANKS.length;i++){ if(player.factionPointsTotal >= FACTION_RANKS[i].threshold) idx = i; }
+  return idx;
+}
+const ESCORT_DPS = 14;
+const ESCORT_RANGE = 550;
+const ESCORT_MINE_LEVEL = 25;       // escort can start mining asteroids at this level
+const ESCORT_COLLECT_LEVEL = 50;    // escort can start collecting ore chunks at this level
+const ESCORT_MINE_DPS = 9;
+const ESCORT_MINE_RANGE = 260;
+const ESCORT_COLLECT_RANGE = 260;
+const ESCORT_XP_SHARE = 0.5; // fraction of the player's XP gains the escort also earns
+function escortXpToNext(level){ return Math.round(25 * Math.pow(level, 1.15)); }
+function escortCargoCapacity(){ return player.escortCargoLevel>0 ? 20 + (player.escortCargoLevel-1)*15 : 0; }
+
+/* ============================= STATE ============================= */
+let canvas, ctx, W, H;
+let radarCanvas, radarCtx;
+let keys = {};
+let last = performance.now();
+let running = false;
+
+let player = {
+  x: STATION.x, y: STATION.y + 260, vx:0, vy:0, angle: -Math.PI/2,
+  hull: 100, hullMax: 100,
+  level: 1, xp: 0,
+  cargoLevel: 1, laserLevel: 1, engineLevel: 1, hullLevel: 1, tractorLevel: 0, energyLevel: 1, shieldLevel: 0, scannerLevel: 0,
+  energy: 100,
+  shield: 0,
+  cargo: {}, // material -> count
+  credits: 250,
+  factionPoints: 0,        // spendable balance
+  factionPointsTotal: 0,   // lifetime total, drives rank — never decreases
+  factionPerks: { discountLicense:false, tractorOvercharge:false, shieldOvercharge:false, darkMatterCharts:false, escortContract:false },
+  hasMissileLauncher: false,
+  missileAmmo: 0,
+  dmmAmmo: 0,
+  hasSmelter: false,
+  escortCargoLevel: 0,
+  hasRamScoop: false,
+  frigatesKilled: 0,
+  nebulaQuestAccepted: false,
+  gasTankLevel: 0,
+  gasBuffer: {},
+};
+let crew = []; // {id,name,role,level,xp}
+let asteroids = [];
+let pirates = [];
+let escort = null; // friendly faction ship, unlocked via Escort Contract perk
+let escortSaveData = null;
+let missiles = [];
+let missileCooldown = 0;
+let oreChunks = [];
+let particles = [];
+let stars = [];
+let zone = 'normal'; // 'normal' | 'deep'
+let zoneStash = {}; // holds the inactive zone's asteroids/pirates/oreChunks/gasClouds while away
+let stargate = null; // spawned once the Frontier Trial quest is complete
+let gasClouds = [];
+let nebulaGate = null; // spawned once the frigate-kill milestone is reached
+let nebulaGateReady = false;
+let quest = {
+  piratesKilled: 0,
+  darkMatterCollected: 0,
+  completed: false,
+};
+const QUEST_PIRATE_TARGET = 5;
+const QUEST_DARKMATTER_TARGET = 1;
+const QUEST_RANK_TARGET = 3; // FACTION_RANKS index — "Veteran Partner"
+const STARGATE_POS = {x: WORLD-400, y: 400};
+const OUTPOST_POS = {x: WORLD-1800, y: 1300};
+const OUTPOST_DOCK_RADIUS = 170;
+const OUTPOST_SELL_MULT = 0.8;      // black market fence prices — worse than the real station
+const OUTPOST_MISSILE_COST = 220;   // ship missiles — the fence is now the only place to buy them
+const FRIGATE_HP = PIRATE_HP_BASE * 2;      // "2x hit points"
+const FRIGATE_SHIELD = 80;                  // roughly double a base deflector shield
+const FRIGATE_DPS = PIRATE_DPS * 1.6;
+const FRIGATE_TARGET_COUNT = 5;
+const CORVETTE_HP = PIRATE_HP_BASE * 4;       // roughly 2x a Frigate
+const CORVETTE_SHIELD = 140;
+const CORVETTE_DPS = PIRATE_DPS * 2.2;
+const CORVETTE_BOUNTY_MULT = 5;
+const CORVETTE_TARGET_COUNT = 4;
+const CORVETTE_SCALE = 2.2; // visual/collision size multiplier vs a base pirate
+const SCRAP_DROP_MIN = 2, SCRAP_DROP_MAX = 5;
+
+/* ============================= NEBULA / RAM SCOOP ============================= */
+const RAM_SCOOP_UNLOCK_FRIGATES = 15;  // frigate kills required to unlock Ram Scoop + the Nebula Gate
+const RAM_SCOOP_COST = 4200;
+const RAM_SCOOP_ENERGY_COST = 7;       // per second while active
+const RAM_SCOOP_EXTRACT_RATE = 12;     // gas units per second, before crew bonus
+const NEBULA_GATE_POS = {x: 900, y: 4300};
+const GAS_CLOUD_TARGET_COUNT = 10;
+const GAS_CLOUD_MIN_VOLUME = 350;
+const GAS_CLOUD_MAX_VOLUME = 750;
+
+/* ============================= SOUND ============================= */
+let audioCtx = null;
+let masterGain = null;
+let sfxMuted = false;
+const SFX_VOLUME = 0.35;
+let laserLoopOsc = null, laserLoopOsc2 = null, laserLoopGain = null, laserLoopLFO = null, laserLoopLFOGain = null;
+let engineLoopSrc = null, engineLoopGain = null, engineSoundOn = false;
+let tractorLoopOsc = null, tractorLoopGain = null;
+let laserSoundOn = false, tractorSoundOn = false;
+let hitSoundCooldown = 0;
+
+function initAudio(){
+  if(audioCtx) return;
+  try{
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = sfxMuted ? 0 : SFX_VOLUME;
+    masterGain.connect(audioCtx.destination);
+  }catch(e){ audioCtx = null; }
+}
+function setMuted(m){
+  sfxMuted = m;
+  if(masterGain) masterGain.gain.value = m ? 0 : SFX_VOLUME;
+}
+function toggleMute(){
+  initAudio();
+  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  setMuted(!sfxMuted);
+  const btn = document.getElementById('sound-toggle-btn');
+  if(btn) btn.textContent = sfxMuted ? '🔇' : '🔊';
+}
+
+// Short synthesized tone with an attack/decay envelope and optional pitch sweep
+function tone(freq, dur, opts){
+  if(!audioCtx || sfxMuted) return;
+  opts = opts || {};
+  const type = opts.type || 'sine', vol = opts.vol!==undefined?opts.vol:0.25;
+  const freqEnd = opts.freqEnd!==undefined?opts.freqEnd:null;
+  const attack = opts.attack!==undefined?opts.attack:0.01;
+  const decay = opts.decay || dur;
+  const t0 = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  if(freqEnd!==null) osc.frequency.exponentialRampToValueAtTime(Math.max(1,freqEnd), t0+dur);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.linearRampToValueAtTime(vol, t0+attack);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0+decay);
+  osc.connect(gain); gain.connect(masterGain);
+  osc.start(t0); osc.stop(t0+decay+0.03);
+}
+// Filtered white-noise burst — good for impacts, cracks, explosions
+function noiseBurst(dur, opts){
+  if(!audioCtx || sfxMuted) return;
+  opts = opts || {};
+  const vol = opts.vol!==undefined?opts.vol:0.3;
+  const filterFreq = opts.filterFreq || 1200;
+  const filterType = opts.filterType || 'lowpass';
+  const t0 = audioCtx.currentTime;
+  const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate*dur));
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * (1 - i/bufferSize); }
+  const src = audioCtx.createBufferSource();
+  src.buffer = buffer;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = filterType; filter.frequency.value = filterFreq;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+  src.connect(filter); filter.connect(gain); gain.connect(masterGain);
+  src.start(t0);
+}
+
+function sfxAsteroidCrack(){ noiseBurst(0.22,{vol:0.22,filterFreq:700}); tone(120,0.15,{type:'sawtooth',vol:0.1,freqEnd:50}); }
+function sfxOreCollect(){ tone(660,0.08,{type:'sine',vol:0.14,freqEnd:1100}); }
+function sfxMissileLaunch(){ noiseBurst(0.18,{vol:0.16,filterFreq:2500,filterType:'highpass'}); tone(300,0.22,{type:'sawtooth',vol:0.13,freqEnd:700}); }
+function sfxExplosion(){ noiseBurst(0.4,{vol:0.32,filterFreq:500}); tone(80,0.3,{type:'triangle',vol:0.18,freqEnd:30}); }
+function sfxLevelUp(){ [523,659,784,1046].forEach((f,i)=> setTimeout(()=>tone(f,0.18,{type:'triangle',vol:0.16}), i*90)); }
+function sfxDock(){ tone(140,0.2,{type:'sine',vol:0.18,freqEnd:90}); }
+function sfxUndock(){ tone(220,0.25,{type:'sine',vol:0.16,freqEnd:340}); }
+function sfxClick(){ tone(900,0.04,{type:'square',vol:0.05}); }
+function sfxSell(){ [880,1174].forEach((f,i)=> setTimeout(()=>tone(f,0.09,{type:'sine',vol:0.13}), i*60)); }
+function sfxWarp(){ tone(200,1.1,{type:'sawtooth',vol:0.16,freqEnd:1400,attack:0.05}); noiseBurst(1.1,{vol:0.08,filterFreq:3000,filterType:'highpass'}); }
+function sfxLowEnergy(){ tone(220,0.15,{type:'square',vol:0.09}); }
+function sfxShieldHit(){ tone(700,0.12,{type:'sine',vol:0.11,freqEnd:400}); }
+function sfxHullHit(){ noiseBurst(0.12,{vol:0.16,filterFreq:300}); }
+function sfxSmelt(){ noiseBurst(0.3,{vol:0.15,filterFreq:900}); tone(200,0.35,{type:'triangle',vol:0.1,freqEnd:120}); }
+
+function startLaserLoop(){
+  if(!audioCtx || laserLoopOsc) return;
+  const t0 = audioCtx.currentTime;
+  laserLoopOsc = audioCtx.createOscillator();
+  laserLoopOsc2 = audioCtx.createOscillator();
+  laserLoopGain = audioCtx.createGain();
+  laserLoopOsc.type = 'sawtooth';
+  laserLoopOsc2.type = 'sawtooth';
+  laserLoopOsc.frequency.value = 210;
+  laserLoopOsc2.frequency.value = 216; // slight detune against the first oscillator for thickness
+
+  // base envelope
+  laserLoopGain.gain.setValueAtTime(0.0001, t0);
+  laserLoopGain.gain.linearRampToValueAtTime(0.045, t0+0.03);
+
+  // pulsing LFO modulates the beam's volume rhythmically instead of a flat hum
+  laserLoopLFO = audioCtx.createOscillator();
+  laserLoopLFO.type = 'sine';
+  laserLoopLFO.frequency.value = 9;
+  laserLoopLFOGain = audioCtx.createGain();
+  laserLoopLFOGain.gain.value = 0.022;
+  laserLoopLFO.connect(laserLoopLFOGain);
+  laserLoopLFOGain.connect(laserLoopGain.gain);
+
+  laserLoopOsc.connect(laserLoopGain);
+  laserLoopOsc2.connect(laserLoopGain);
+  laserLoopGain.connect(masterGain);
+
+  laserLoopOsc.start(t0);
+  laserLoopOsc2.start(t0);
+  laserLoopLFO.start(t0);
+}
+function stopLaserLoop(){
+  if(!laserLoopOsc) return;
+  const t0 = audioCtx.currentTime;
+  try{ laserLoopGain.gain.exponentialRampToValueAtTime(0.001, t0+0.06); }catch(e){}
+  laserLoopOsc.stop(t0+0.09);
+  laserLoopOsc2.stop(t0+0.09);
+  laserLoopLFO.stop(t0+0.09);
+  laserLoopOsc = null; laserLoopOsc2 = null; laserLoopGain = null; laserLoopLFO = null; laserLoopLFOGain = null;
+}
+function startTractorLoop(){
+  if(!audioCtx || tractorLoopOsc) return;
+  tractorLoopOsc = audioCtx.createOscillator();
+  tractorLoopGain = audioCtx.createGain();
+  tractorLoopOsc.type = 'sine';
+  tractorLoopOsc.frequency.value = 90;
+  tractorLoopGain.gain.value = 0.0001;
+  tractorLoopGain.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime+0.05);
+  tractorLoopOsc.connect(tractorLoopGain); tractorLoopGain.connect(masterGain);
+  tractorLoopOsc.start();
+}
+function stopTractorLoop(){
+  if(!tractorLoopOsc) return;
+  try{ tractorLoopGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.08); }catch(e){}
+  tractorLoopOsc.stop(audioCtx.currentTime+0.12);
+  tractorLoopOsc = null; tractorLoopGain = null;
+}
+function startEngineLoop(){
+  if(!audioCtx || engineLoopSrc) return;
+  const t0 = audioCtx.currentTime;
+  const bufferSize = audioCtx.sampleRate * 1;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++){ data[i] = Math.random()*2-1; }
+  engineLoopSrc = audioCtx.createBufferSource();
+  engineLoopSrc.buffer = buffer;
+  engineLoopSrc.loop = true;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 220;
+  engineLoopGain = audioCtx.createGain();
+  engineLoopGain.gain.setValueAtTime(0.0001, t0);
+  engineLoopGain.gain.linearRampToValueAtTime(0.09, t0+0.09);
+  engineLoopSrc.connect(filter);
+  filter.connect(engineLoopGain);
+  engineLoopGain.connect(masterGain);
+  engineLoopSrc.start(t0);
+}
+function stopEngineLoop(){
+  if(!engineLoopSrc) return;
+  const t0 = audioCtx.currentTime;
+  try{ engineLoopGain.gain.exponentialRampToValueAtTime(0.001, t0+0.12); }catch(e){}
+  const src = engineLoopSrc;
+  setTimeout(()=>{ try{ src.stop(); }catch(e){} }, 180);
+  engineLoopSrc = null; engineLoopGain = null;
+}
+const FRIGATE_LAUNCHER_DROP_CHANCE = 0.25;
+const MISSILE_DAMAGE = 60;
+const MISSILE_SPEED = 380;
+const MISSILE_TURN_RATE = 3.4; // radians/sec — how tightly it can home in
+const MISSILE_LIFE = 6;
+const MISSILE_COOLDOWN = 2.0;
+const MISSILE_ACQUIRE_RANGE = 900;
+const MISSILE_MAX_AMMO = 30;       // total missile bay capacity, in "slots"
+const SHIP_MISSILE_WEIGHT = 1;
+const DMM_WEIGHT = 10;
+const DMM_MAX_COUNT = 3;           // hard cap regardless of remaining bay capacity
+const DMM_DAMAGE_PCT = 0.2;        // fraction of the target's max HP per hit — 5 hits per fragment
+const MISSILE_BATCH_SIZE = 5;
+const OUTPOST_DMM_COST = 2200;
+const SHIP_MISSILE_DROP_CHANCE = 0.22; // any destroyed pirate/frigate
+const DMM_DROP_CHANCE = 0.15;          // frigates only
+let firing = false;
+let laserTarget = null;
+let laserTargetType = null;
+let laserProximityMult = 1;
+let tractorTargets = [];
+let scoopTargets = [];
+let dockable = false;
+let gateReady = false;
+let outpostDockable = false;
+let docked = false;
+let manifestOpen = false;
+let msgCooldown = 0;
+let energyWarnCooldown = 0;
+let gasTankWarnCooldown = 0;
+let cargoFullWarnCooldown = 0;
+let energyCharging = false;
+let shieldRegenCooldown = 0;
+let missileTrackTarget = null; // keeps the target-lock HUD visible briefly after a missile launch
+let missileTrackTimer = 0;
+let camera = {x:0,y:0};
+
+/* ============================= DERIVED STATS ============================= */
+function roleBonusPct(role){
+  let total = 0;
+  crew.forEach(c=>{ if(c.role===role) total += ROLES[role].perkPer * c.level; });
+  return total/100;
+}
+function missileDamage(){ return MISSILE_DAMAGE * (1 + roleBonusPct('weapons')); }
+function missileCooldownTime(){ return MISSILE_COOLDOWN / (1 + roleBonusPct('weapons')*0.8); }
+function missileSlotsUsed(){ return player.missileAmmo*SHIP_MISSILE_WEIGHT + player.dmmAmmo*DMM_WEIGHT; }
+function canAddShipMissiles(qty){ return missileSlotsUsed() + qty*SHIP_MISSILE_WEIGHT <= MISSILE_MAX_AMMO; }
+function canAddDMM(qty){ return player.dmmAmmo + qty <= DMM_MAX_COUNT && missileSlotsUsed() + qty*DMM_WEIGHT <= MISSILE_MAX_AMMO; }
+function cargoCapacity(){
+  const base = 16 + (player.cargoLevel-1)*12;
+  return Math.round(base * (1 + roleBonusPct('quarter')));
+}
+function laserDamage(){
+  const base = 5 + (player.laserLevel-1)*3.2;
+  return base * (1 + roleBonusPct('miner'));
+}
+function laserRange(){ return 230 + (player.laserLevel-1)*22; }
+const LASER_PROXIMITY_MAX_MULT = 1.75; // point-blank damage bonus
+const LASER_PROXIMITY_MIN_MULT = 0.65; // damage falloff at max range
+function laserProximityMultiplier(dist, range){
+  const t = Math.max(0, Math.min(1, dist/range));
+  return LASER_PROXIMITY_MAX_MULT - (LASER_PROXIMITY_MAX_MULT-LASER_PROXIMITY_MIN_MULT)*t;
+}
+function maxSpeed(){
+  const base = 165 + (player.engineLevel-1)*24;
+  return base * (1 + roleBonusPct('nav'));
+}
+function accelRate(){ return 130 + (player.engineLevel-1)*20; }
+function turnRate(){
+  const base = 2.6 + (player.engineLevel-1)*0.18;
+  return base * (1 + roleBonusPct('nav')*0.6);
+}
+function hullMax(){ return 100 + (player.hullLevel-1)*30; }
+function tractorRange(){ return player.tractorLevel>0 ? 150 + (player.tractorLevel-1)*45 : 0; }
+function tractorStrength(){ return player.tractorLevel>0 ? 230 + (player.tractorLevel-1)*90 : 0; }
+function energyMax(){ return 100 + (player.energyLevel-1)*40; }
+function energyRegen(){ return 3.5 + (player.energyLevel-1)*0.8; }
+function shieldMax(){ return player.shieldLevel>0 ? 50 + (player.shieldLevel-1)*30 : 0; }
+function shieldRegenRate(){ return 8 + (player.shieldLevel-1)*2; }
+function scannerRange(){ return player.scannerLevel>=2 ? Infinity : 700; }
+function scannerCanID(a){
+  if(player.scannerLevel<=0) return false;
+  if(player.scannerLevel>=2) return true;
+  return Math.hypot(a.x-player.x, a.y-player.y) <= scannerRange();
+}
+function applyDamage(amount){
+  if(amount<=0) return;
+  let remaining = amount;
+  let absorbedByShield = false;
+  if(player.shieldLevel>0 && player.shield>0){
+    const absorb = Math.min(player.shield, remaining);
+    player.shield -= absorb;
+    remaining -= absorb;
+    absorbedByShield = true;
+  }
+  if(remaining>0){ player.hull = Math.max(0, player.hull - remaining); }
+  shieldRegenCooldown = 3;
+  if(hitSoundCooldown<=0){
+    if(remaining>0) sfxHullHit(); else if(absorbedByShield) sfxShieldHit();
+    hitSoundCooldown = 0.22;
+  }
+}
+const LASER_ENERGY_COST = 13;   // per second while firing
+const TRACTOR_ENERGY_COST = 9;  // per second while active
+function xpToNext(level){ return Math.round(50 * Math.pow(level,1.42)); }
+function cargoUsed(){
+  return Object.entries(player.cargo).reduce((sum,[k,v])=>{
+    if(MATERIALS[k] && MATERIALS[k].gas) return sum; // gas lives in its own tank, not the cargo hold
+    return sum + v*((MATERIALS[k]&&MATERIALS[k].cargoWeight)||1);
+  }, 0);
+}
+function gasUsed(){
+  return Object.entries(player.cargo).reduce((sum,[k,v])=>{
+    if(!(MATERIALS[k] && MATERIALS[k].gas)) return sum;
+    return sum + v*(MATERIALS[k].cargoWeight||1);
+  }, 0);
+}
+function gasTankCapacity(){ return player.gasTankLevel>0 ? 20 + (player.gasTankLevel-1)*15 : 0; }
+function smeltOre(oreKey, amount){
+  if(!player.hasSmelter) return false;
+  if(!SMELTABLE_KEYS.includes(oreKey)) return false;
+  const have = player.cargo[oreKey] || 0;
+  if(have < amount) return false;
+  const ingotKey = 'ingot_'+oreKey;
+  const ingots = Math.floor(amount / SMELT_RATIO);
+  if(ingots <= 0) return false;
+  const used = ingots * SMELT_RATIO; // only consume in clean multiples of the ratio
+  player.cargo[oreKey] = have - used;
+  player.cargo[ingotKey] = (player.cargo[ingotKey]||0) + ingots;
+  toast(`Smelted ${used} ${MATERIALS[oreKey].name} into ${ingots} ${MATERIALS[ingotKey].name}${ingots>1?'s':''}`);
+  sfxSmelt();
+  return true;
+}
+
+/* ============================= SAVE / LOAD ============================= */
+let saveFailCount = 0;
+let saveDisabledUntil = 0;
+function hasClaudeStorage(){
+  return typeof window !== 'undefined' && window.storage && typeof window.storage.set === 'function';
+}
+async function saveGame(){
+  const now = performance.now();
+  if(now < saveDisabledUntil) return;
+  const escortSave = escort ? {level:escort.level, xp:escort.xp, cargo:escort.cargo} : null;
+  const data = {player, crew, quest, zone, escort: escortSave};
+  try{
+    if(hasClaudeStorage()){
+      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(data), false);
+      if(result){ saveFailCount = 0; }
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      saveFailCount = 0;
+    }
+  }catch(e){
+    saveFailCount++;
+    // back off instead of retrying every few seconds and spamming errors
+    if(saveFailCount === 1){
+      toast('Autosave hiccup — still playing fine, will retry shortly.', 'warn');
+    } else if(saveFailCount >= 3){
+      saveDisabledUntil = now + 60000; // pause autosave attempts for 60s
+      if(saveFailCount === 3){
+        toast('Autosave paused for a bit — your run continues locally.', 'warn');
+      }
+    }
+  }
+}
+async function loadGame(){
+  try{
+    let raw = null;
+    if(hasClaudeStorage()){
+      const res = await window.storage.get(STORAGE_KEY, false);
+      raw = res && res.value;
+    } else {
+      raw = localStorage.getItem(STORAGE_KEY);
+    }
+    if(raw){
+      const data = JSON.parse(raw);
+      Object.assign(player, data.player);
+      player.hullMax = hullMaxSafe(data.player);
+      crew = data.crew || [];
+      if(data.quest) Object.assign(quest, data.quest);
+      if(data.zone) zone = data.zone;
+      if(data.escort) escortSaveData = data.escort;
+      return true;
+    }
+  }catch(e){ /* no save yet */ }
+  return false;
+}
+function hullMaxSafe(p){ return 100 + ((p.hullLevel||1)-1)*30; }
+async function resetSave(){
+  try{
+    if(hasClaudeStorage()){ await window.storage.delete(STORAGE_KEY, false); }
+    else { localStorage.removeItem(STORAGE_KEY); }
+  }catch(e){}
+  location.reload();
+}
+let saveTimer = 0;
+
+/* ============================= INIT ============================= */
+async function startGame(){
+  initAudio();
+  document.getElementById('start-screen').style.display = 'none';
+  await loadGame();
+  player.hull = Math.min(player.hull, hullMax());
+  player.energy = (player.energy===undefined) ? energyMax() : Math.min(player.energy, energyMax());
+  player.shield = (player.shield===undefined) ? shieldMax() : Math.min(player.shield, shieldMax());
+  setupCanvas();
+  spawnStars();
+  if(quest.completed) spawnStargate();
+  if(player.frigatesKilled >= RAM_SCOOP_UNLOCK_FRIGATES){
+    nebulaGate = { x: NEBULA_GATE_POS.x, y: NEBULA_GATE_POS.y, radius: 150 };
+  }
+  if(zone === 'deep'){
+    ensureDeepAsteroidPopulation(true);
+    ensureFrigatePopulation();
+  } else if(zone === 'nebula'){
+    ensureGasCloudPopulation();
+    ensureFrigatePopulation();
+  } else {
+    ensureAsteroidPopulation(true);
+    ensureDarkMatterPopulation();
+  }
+  running = true;
+  last = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function setupCanvas(){
+  canvas = document.getElementById('game');
+  ctx = canvas.getContext('2d');
+  radarCanvas = document.getElementById('radar');
+  radarCtx = radarCanvas.getContext('2d');
+  resize();
+  window.addEventListener('resize', resize);
+}
+function resize(){
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+
+function spawnStars(){
+  stars = [];
+  for(let i=0;i<420;i++){
+    stars.push({x:Math.random()*WORLD*1.4-WORLD*0.2, y:Math.random()*WORLD*1.4-WORLD*0.2,
+      r: Math.random()*1.6+0.3, tw: Math.random()*Math.PI*2, depth: Math.random()*0.6+0.2});
+  }
+}
+
+/* ============================= INPUT ============================= */
+/* ============================= HOLD-TO-REPEAT ============================= */
+// Lets a button be held down to fire repeatedly instead of requiring dozens of individual clicks.
+let holdRepeatFn = null;
+let holdRepeatDelay = null;
+let holdRepeatTimer = null;
+function startHoldRepeat(fn){
+  stopHoldRepeat();
+  holdRepeatFn = fn;
+  fn(); // fire once immediately, same as a normal click
+  holdRepeatDelay = setTimeout(()=>{
+    holdRepeatTimer = setInterval(()=>{ if(holdRepeatFn) holdRepeatFn(); }, 110);
+  }, 350); // short delay before repeat kicks in, like OS key-repeat
+}
+function stopHoldRepeat(){
+  clearTimeout(holdRepeatDelay);
+  clearInterval(holdRepeatTimer);
+  holdRepeatDelay = null;
+  holdRepeatTimer = null;
+  holdRepeatFn = null;
+}
+window.addEventListener('mouseup', stopHoldRepeat);
+window.addEventListener('touchend', stopHoldRepeat);
+window.addEventListener('touchcancel', stopHoldRepeat);
+
+window.addEventListener('keydown', e=>{
+  keys[e.key.toLowerCase()] = true;
+  if(e.key===' '){ firing = true; e.preventDefault(); }
+  if(e.key.toLowerCase()==='e'){ tryDock(); }
+  if(e.key.toLowerCase()==='z'){ fireMissile(); }
+  if(e.key.toLowerCase()==='i'){ toggleManifest(); }
+  if(e.key==='Escape'){ closeStation(); closeOutpost(); closeManifest(); }
+});
+window.addEventListener('keyup', e=>{
+  keys[e.key.toLowerCase()] = false;
+  if(e.key===' '){ firing = false; }
+});
+
+/* ============================= ASTEROID / ORE LOGIC ============================= */
+function pickMaterial(){
+  let r = Math.random()*TOTAL_WEIGHT;
+  for(const k of MINEABLE_KEYS){ r -= MATERIALS[k].weight; if(r<=0) return k; }
+  return 'iron';
+}
+function makeShape(radius){
+  const pts = [];
+  const n = 9 + Math.floor(Math.random()*5);
+  for(let i=0;i<n;i++){
+    const a = (i/n)*Math.PI*2;
+    const rr = radius * (0.72 + Math.random()*0.42);
+    pts.push({a, r: rr});
+  }
+  return pts;
+}
+const GRAY_TONES = ['#767f8c', '#6b7280', '#818a97', '#707886'];
+function spawnAsteroidField(x,y,tier,material,parentVx,parentVy){
+  const isDark = material === 'darkmatter';
+  const radius = isDark ? DARKMATTER_RADIUS[tier] : TIER_RADIUS[tier];
+  const hp = isDark ? DARKMATTER_HP[tier] : TIER_HP[tier];
+  const driftScale = isDark ? 0.3 : 1; // dark matter is dense and barely drifts
+  const a = {
+    x, y,
+    vx: (parentVx||0) + (Math.random()-0.5)*40*driftScale,
+    vy: (parentVy||0) + (Math.random()-0.5)*40*driftScale,
+    tier, material, // material is null for tier 0/1 — composition unknown until fully broken down
+    grayTone: material ? null : GRAY_TONES[Math.floor(Math.random()*GRAY_TONES.length)],
+    radius,
+    hp, maxHp: hp,
+    shape: makeShape(radius),
+    rot: Math.random()*Math.PI*2,
+    rotSpeed: (Math.random()-0.5)*0.6*(isDark?0.4:1),
+  };
+  asteroids.push(a);
+  return a;
+}
+function ensureAsteroidPopulation(initial){
+  const target = 42;
+  let count = asteroids.filter(a=>a.tier===0).length;
+  while(count < target){
+    let x,y;
+    do{
+      x = Math.random()*WORLD;
+      y = Math.random()*WORLD;
+    } while(Math.hypot(x-STATION.x,y-STATION.y) < 420);
+    spawnAsteroidField(x,y,0,null); // composition unrevealed until it's broken down small
+    count++;
+    if(!initial) break;
+  }
+}
+function ensureDarkMatterPopulation(){
+  const target = 2; // only ever 2 dark matter deposits exist in the world at once
+  let count = asteroids.filter(a=>a.material==='darkmatter' && a.tier===0).length;
+  let guard = 0;
+  while(count < target && guard < 10){
+    guard++;
+    let x,y;
+    do{
+      x = Math.random()*WORLD;
+      y = Math.random()*WORLD;
+    } while(Math.hypot(x-STATION.x,y-STATION.y) < 1200);
+    spawnAsteroidField(x,y,0,'darkmatter');
+    count++;
+  }
+}
+function ensureDeepAsteroidPopulation(initial){
+  const target = 42;
+  let count = asteroids.filter(a=>a.tier===0).length;
+  while(count < target){
+    let x,y;
+    do{
+      x = Math.random()*WORLD;
+      y = Math.random()*WORLD;
+    } while(Math.hypot(x-STARGATE_POS.x,y-STARGATE_POS.y) < 350 || Math.hypot(x-OUTPOST_POS.x,y-OUTPOST_POS.y) < 350);
+    spawnAsteroidField(x,y,0,null);
+    count++;
+    if(!initial) break;
+  }
+}
+
+/* ============================= GAS CLOUDS ============================= */
+function spawnGasCloud(x,y){
+  const material = pickGas();
+  const maxVolume = GAS_CLOUD_MIN_VOLUME + Math.random()*(GAS_CLOUD_MAX_VOLUME-GAS_CLOUD_MIN_VOLUME);
+  gasClouds.push({
+    x, y, radius: 140+Math.random()*70,
+    material, volume: maxVolume, maxVolume,
+    vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8,
+    driftPhase: Math.random()*Math.PI*2,
+  });
+}
+function ensureGasCloudPopulation(){
+  let guard = 0;
+  while(gasClouds.length < GAS_CLOUD_TARGET_COUNT && guard < 20){
+    guard++;
+    let x,y;
+    do{
+      x = Math.random()*WORLD;
+      y = Math.random()*WORLD;
+    } while(Math.hypot(x-NEBULA_GATE_POS.x,y-NEBULA_GATE_POS.y) < 350);
+    spawnGasCloud(x,y);
+  }
+}
+
+/* ============================= QUEST / STARGATE / DEEP ZONE ============================= */
+function checkQuestCompletion(){
+  if(quest.completed) return;
+  const rankOk = factionRankIndex() >= QUEST_RANK_TARGET;
+  if(quest.piratesKilled >= QUEST_PIRATE_TARGET && quest.darkMatterCollected >= QUEST_DARKMATTER_TARGET && rankOk){
+    quest.completed = true;
+    spawnStargate();
+    toast('Frontier Trial complete! A Stargate has powered up in the far reaches of the system.', 'levelup');
+    saveGame();
+  }
+}
+function acceptNebulaQuest(){
+  if(player.nebulaQuestAccepted) return;
+  player.nebulaQuestAccepted = true;
+  toast('Frigate Bounty accepted — tracked in your HUD.', 'levelup');
+  sfxClick();
+  renderFactionTab();
+  updateHUD();
+  saveGame();
+}
+function spawnStargate(){
+  stargate = { x: STARGATE_POS.x, y: STARGATE_POS.y, radius: 150 };
+}
+function warpZone(){
+  sfxWarp();
+  // stash the zone we're leaving, restore (or start fresh) whatever the destination zone had
+  zoneStash[zone] = { asteroids, pirates, oreChunks, gasClouds };
+  const newZone = zone === 'normal' ? 'deep' : 'normal';
+  if(zoneStash[newZone]){
+    asteroids = zoneStash[newZone].asteroids;
+    pirates = zoneStash[newZone].pirates;
+    oreChunks = zoneStash[newZone].oreChunks;
+    gasClouds = zoneStash[newZone].gasClouds || [];
+  } else {
+    asteroids = []; pirates = []; oreChunks = []; gasClouds = [];
+  }
+  zone = newZone;
+  player.x = STARGATE_POS.x - 160;
+  player.y = STARGATE_POS.y + 160;
+  player.vx = 0; player.vy = 0;
+  if(zone === 'deep'){
+    ensureDeepAsteroidPopulation(true);
+    ensureFrigatePopulation();
+    toast('Warping into uncharted deep space... frigates detected.', 'warn');
+  } else {
+    toast('Returning to charted space.', 'levelup');
+  }
+  saveGame();
+}
+
+function warpNebula(){
+  sfxWarp();
+  zoneStash[zone] = { asteroids, pirates, oreChunks, gasClouds };
+  const newZone = zone === 'nebula' ? 'deep' : 'nebula';
+  if(zoneStash[newZone]){
+    asteroids = zoneStash[newZone].asteroids;
+    pirates = zoneStash[newZone].pirates;
+    oreChunks = zoneStash[newZone].oreChunks;
+    gasClouds = zoneStash[newZone].gasClouds || [];
+  } else {
+    asteroids = []; pirates = []; oreChunks = []; gasClouds = [];
+  }
+  zone = newZone;
+  player.x = NEBULA_GATE_POS.x - 160;
+  player.y = NEBULA_GATE_POS.y + 160;
+  player.vx = 0; player.vy = 0;
+  if(zone === 'nebula'){
+    ensureGasCloudPopulation();
+    ensureFrigatePopulation();
+    toast('Entering the nebula... sensors detect rich gas deposits.', 'warn');
+  } else {
+    toast('Returning to the Deep Zone.', 'levelup');
+  }
+  saveGame();
+}
+
+/* ============================= PIRATES ============================= */
+function spawnPirate(x,y){
+  pirates.push({
+    x, y, vx:0, vy:0, angle: Math.random()*Math.PI*2,
+    hp: PIRATE_HP_BASE, maxHp: PIRATE_HP_BASE,
+    shield: 0, shieldMax: 0, shieldRegenCooldown: 0, isFrigate: false,
+    state: 'patrol', wanderAngle: Math.random()*Math.PI*2, wanderTimer: 0,
+    fleeTimer: 0, stealCooldown: 0, attacking: false,
+    stolen: {},
+  });
+}
+function spawnFrigate(x,y){
+  pirates.push({
+    x, y, vx:0, vy:0, angle: Math.random()*Math.PI*2,
+    hp: FRIGATE_HP, maxHp: FRIGATE_HP,
+    shield: FRIGATE_SHIELD, shieldMax: FRIGATE_SHIELD, shieldRegenCooldown: 0, isFrigate: true,
+    state: 'patrol', wanderAngle: Math.random()*Math.PI*2, wanderTimer: 0,
+    fleeTimer: 0, stealCooldown: 0, attacking: false,
+    stolen: {},
+  });
+}
+function ensurePiratePopulation(){
+  const target = pirateTargetCount();
+  let guard = 0;
+  while(pirates.length < target && guard < 20){
+    guard++;
+    let x,y;
+    do{
+      x = Math.random()*WORLD;
+      y = Math.random()*WORLD;
+    } while(Math.hypot(x-STATION.x,y-STATION.y) < 700 || Math.hypot(x-player.x,y-player.y) < 500);
+    spawnPirate(x,y);
+  }
+}
+function ensureFrigatePopulation(){
+  const target = FRIGATE_TARGET_COUNT;
+  let guard = 0;
+  while(pirates.length < target && guard < 20){
+    guard++;
+    let x,y;
+    do{
+      x = Math.random()*WORLD;
+      y = Math.random()*WORLD;
+    } while(Math.hypot(x-player.x,y-player.y) < 500);
+    spawnFrigate(x,y);
+  }
+}
+function spawnCorvette(x,y){
+  pirates.push({
+    x, y, vx:0, vy:0, angle: Math.random()*Math.PI*2,
+    hp: CORVETTE_HP, maxHp: CORVETTE_HP,
+    shield: CORVETTE_SHIELD, shieldMax: CORVETTE_SHIELD, shieldRegenCooldown: 0,
+    isFrigate: false, isCorvette: true,
+    state: 'patrol', wanderAngle: Math.random()*Math.PI*2, wanderTimer: 0,
+    fleeTimer: 0, stealCooldown: 0, attacking: false,
+    stolen: {},
+  });
+}
+function ensureCorvettePopulation(){
+  const target = CORVETTE_TARGET_COUNT;
+  let guard = 0;
+  while(pirates.length < target && guard < 20){
+    guard++;
+    let x,y;
+    do{
+      x = Math.random()*WORLD;
+      y = Math.random()*WORLD;
+    } while(Math.hypot(x-player.x,y-player.y) < 500 || Math.hypot(x-NEBULA_GATE_POS.x,y-NEBULA_GATE_POS.y) < 400);
+    spawnCorvette(x,y);
+  }
+}
+// Shared damage helper for pirates/frigates — shield absorbs first, same pattern as the player's applyDamage.
+function damagePirate(p, amount){
+  if(amount<=0) return;
+  let remaining = amount;
+  if(p.shieldMax>0 && p.shield>0){
+    const absorb = Math.min(p.shield, remaining);
+    p.shield -= absorb;
+    remaining -= absorb;
+  }
+  if(remaining>0) p.hp -= remaining;
+  p.shieldRegenCooldown = 3;
+}
+function destroyPirate(p){
+  const idx = pirates.indexOf(p);
+  if(idx>=0) pirates.splice(idx,1);
+  sfxExplosion();
+  quest.piratesKilled++;
+  checkQuestCompletion();
+  const bountyMul = p.isCorvette ? CORVETTE_BOUNTY_MULT : (p.isFrigate ? 3 : 1);
+  const bounty = Math.round((PIRATE_BOUNTY_MIN + Math.random()*(PIRATE_BOUNTY_MAX-PIRATE_BOUNTY_MIN)) * bountyMul);
+  player.credits += bounty;
+  grantXp(bounty*0.15);
+  const shipLabel = p.isCorvette ? 'Corvette' : (p.isFrigate ? 'Frigate' : 'Pirate');
+  toast(`${shipLabel} destroyed! +${bounty} cr bounty`, 'levelup');
+  // any cargo it stole but hadn't gotten away with drops back as recoverable ore
+  Object.keys(p.stolen).forEach(mat=>{
+    for(let i=0;i<p.stolen[mat];i++){
+      const ang = Math.random()*Math.PI*2;
+      const speed = 30+Math.random()*40;
+      oreChunks.push({x:p.x,y:p.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,material:mat,life:0});
+    }
+  });
+  spawnDebris(p.x,p.y, p.isCorvette ? '#a3b8c2' : (p.isFrigate ? '#ff6a3d' : '#e0546b'));
+  if(p.isCorvette){
+    // Corvettes always leave harvestable scrap metal behind
+    const scrapQty = SCRAP_DROP_MIN + Math.floor(Math.random()*(SCRAP_DROP_MAX-SCRAP_DROP_MIN+1));
+    for(let i=0;i<scrapQty;i++){
+      const ang = Math.random()*Math.PI*2;
+      const speed = 25+Math.random()*35;
+      oreChunks.push({x:p.x,y:p.y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,material:'scrap_metal',life:0});
+    }
+    toast(`Corvette wreck left ${scrapQty} Scrap Metal behind — go harvest it.`);
+  }
+  if(p.isFrigate && !player.hasMissileLauncher && Math.random() < FRIGATE_LAUNCHER_DROP_CHANCE){
+    player.hasMissileLauncher = true;
+    toast('Salvaged a Missile Launcher from the wreckage! Buy ammo from the Black Market Relay, fire with Z.', 'levelup');
+    saveGame();
+  } else if(player.hasMissileLauncher){
+    // ammo salvage only makes sense once you actually have the launcher installed
+    if(Math.random() < SHIP_MISSILE_DROP_CHANCE){
+      const qty = 1 + Math.floor(Math.random()*3); // 1-3
+      let added = 0;
+      for(let i=0;i<qty;i++){ if(canAddShipMissiles(1)){ player.missileAmmo++; added++; } }
+      if(added>0) toast(`Salvaged ${added} missile${added>1?'s':''} from the wreckage.`);
+    }
+    if((p.isFrigate || p.isCorvette) && Math.random() < DMM_DROP_CHANCE && canAddDMM(1)){
+      player.dmmAmmo++;
+      toast('Salvaged a Dark Matter Missile from the wreckage!', 'levelup');
+    }
+  }
+  if(p.isFrigate){
+    player.frigatesKilled++;
+    if(player.frigatesKilled === RAM_SCOOP_UNLOCK_FRIGATES){
+      nebulaGate = { x: NEBULA_GATE_POS.x, y: NEBULA_GATE_POS.y, radius: 150 };
+      toast('Frigate salvage patterns decoded! Ram Scoop equipment now available at Ceres, and a new Stargate has powered up in the Deep Zone.', 'levelup');
+      sfxLevelUp();
+      saveGame();
+    }
+  }
+}
+
+// Finds the asteroid (if any) that blocks a straight line between two points —
+// used so pirate fire can be intercepted by asteroids sitting in the way.
+function findLineBlocker(x1,y1,x2,y2){
+  let best = null, bestT = Infinity;
+  for(const a of asteroids){
+    const bx = x2-x1, by = y2-y1;
+    const segLenSq = bx*bx+by*by;
+    let t = segLenSq>0 ? ((a.x-x1)*bx + (a.y-y1)*by)/segLenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px = x1+bx*t, py = y1+by*t;
+    const dist = Math.hypot(px-a.x, py-a.y);
+    if(dist < a.radius && t < bestT){ bestT = t; best = a; }
+  }
+  return best;
+}
+
+function updatePirates(dt){
+  if(zone === 'normal') ensurePiratePopulation();
+  else if(zone === 'nebula') ensureCorvettePopulation();
+  else ensureFrigatePopulation();
+  for(let i=pirates.length-1;i>=0;i--){
+    const p = pirates[i];
+    p.attacking = false;
+    p.blockedTargetX = null;
+    p.blockedTargetY = null;
+    const dps = p.isCorvette ? CORVETTE_DPS : (p.isFrigate ? FRIGATE_DPS : PIRATE_DPS);
+    const dx = player.x-p.x, dy = player.y-p.y;
+    const dist = Math.hypot(dx,dy);
+    const angToPlayer = Math.atan2(dy,dx);
+
+    if(p.state==='flee'){
+      p.angle = Math.atan2(p.y-player.y, p.x-player.x);
+      p.vx = Math.cos(p.angle)*PIRATE_SPEED*1.15;
+      p.vy = Math.sin(p.angle)*PIRATE_SPEED*1.15;
+      p.fleeTimer -= dt;
+      if(p.fleeTimer<=0 || dist>PIRATE_DETECT_RANGE*1.6){
+        const hadLoot = Object.keys(p.stolen).length > 0;
+        toast(hadLoot ? 'The pirate warped out with your cargo!' : 'The pirate warped out and escaped.', 'warn');
+        spawnDebris(p.x, p.y, '#dbe6ea'); // small flash so the despawn reads as a warp-out, not a glitch
+        pirates.splice(i,1);
+        continue;
+      }
+    } else if(dist < PIRATE_DETECT_RANGE){
+      p.state = 'chase';
+      let diff = angToPlayer - p.angle;
+      while(diff>Math.PI) diff-=Math.PI*2;
+      while(diff<-Math.PI) diff+=Math.PI*2;
+      p.angle += Math.max(-3*dt, Math.min(3*dt, diff));
+      p.vx = Math.cos(p.angle)*PIRATE_SPEED;
+      p.vy = Math.sin(p.angle)*PIRATE_SPEED;
+
+      if(dist < PIRATE_FIRE_RANGE){
+        p.attacking = true;
+        const blocker = findLineBlocker(p.x, p.y, player.x, player.y);
+        if(blocker){
+          // an asteroid is in the way — it eats the shot instead of the player
+          blocker.hp -= dps*dt;
+          p.blockedTargetX = blocker.x;
+          p.blockedTargetY = blocker.y;
+          if(blocker.hp <= 0){
+            const bidx = asteroids.indexOf(blocker);
+            if(bidx>=0) asteroids.splice(bidx,1);
+            breakAsteroid(blocker, false); // no free combat XP for the player
+          }
+        } else {
+          applyDamage(dps*dt);
+        }
+      }
+      if(dist < PIRATE_CONTACT_RANGE && p.stealCooldown<=0){
+        const used = cargoUsed();
+        if(used>0){
+          const keysWithCargo = MAT_KEYS.filter(k=>player.cargo[k]>0);
+          const mat = keysWithCargo[Math.floor(Math.random()*keysWithCargo.length)];
+          const stealAmt = Math.max(1, Math.ceil(player.cargo[mat]*PIRATE_STEAL_FRACTION));
+          player.cargo[mat] -= stealAmt;
+          p.stolen[mat] = (p.stolen[mat]||0) + stealAmt;
+          toast(`Pirates raided your hold — lost ${stealAmt} ${MATERIALS[mat].name}!`, 'warn');
+        }
+        applyDamage(10);
+        p.state = 'flee';
+        p.fleeTimer = 6;
+        p.stealCooldown = 999;
+      }
+    } else {
+      p.wanderTimer -= dt;
+      if(p.wanderTimer<=0){ p.wanderAngle = Math.random()*Math.PI*2; p.wanderTimer = 2+Math.random()*3; }
+      p.angle += (p.wanderAngle-p.angle)*0.02;
+      p.vx = Math.cos(p.angle)*PIRATE_PATROL_SPEED;
+      p.vy = Math.sin(p.angle)*PIRATE_PATROL_SPEED;
+    }
+
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.x = Math.max(20,Math.min(WORLD-20,p.x));
+    p.y = Math.max(20,Math.min(WORLD-20,p.y));
+    if(p.stealCooldown>0) p.stealCooldown -= dt;
+
+    // shield regen for shielded pirates (frigates)
+    if(p.shieldMax>0){
+      if(p.shieldRegenCooldown>0){ p.shieldRegenCooldown -= dt; }
+      else { p.shield = Math.min(p.shieldMax, p.shield + p.shieldMax*0.18*dt); }
+    }
+
+    // asteroids are a hazard for pirates too — collisions chip their hull
+    for(const a of asteroids){
+      const adx = a.x-p.x, ady = a.y-p.y;
+      const adist = Math.hypot(adx,ady);
+      if(adist < a.radius*0.8 + 12){
+        damagePirate(p, (3 + a.radius*0.12)*dt*6);
+        const push = 180;
+        p.vx -= (adx/adist)*push*dt;
+        p.vy -= (ady/adist)*push*dt;
+      }
+    }
+    if(p.hp <= 0){
+      destroyPirate(p);
+    }
+  }
+}
+
+/* ============================= FACTION ESCORT ============================= */
+function updateEscort(dt){
+  if(!player.factionPerks.escortContract){
+    escort = null;
+    return;
+  }
+  if(!escort){
+    escort = { x: player.x - 50, y: player.y - 50, vx:0, vy:0, angle: player.angle, attacking:false,
+      level: 1, xp: 0, cargo: {} };
+    if(escortSaveData){
+      escort.level = escortSaveData.level || 1;
+      escort.xp = escortSaveData.xp || 0;
+      escort.cargo = escortSaveData.cargo || {};
+      escortSaveData = null;
+    }
+  }
+  // trail behind and slightly to the side of the player's facing direction
+  const targetX = player.x - Math.cos(player.angle)*75 + Math.sin(player.angle)*35;
+  const targetY = player.y - Math.sin(player.angle)*75 - Math.cos(player.angle)*35;
+  const dx = targetX-escort.x, dy = targetY-escort.y;
+  const dist = Math.hypot(dx,dy);
+  if(dist > 2){
+    const followSpeed = Math.min(320, dist*4);
+    escort.vx = (dx/dist)*followSpeed;
+    escort.vy = (dy/dist)*followSpeed;
+  } else {
+    escort.vx = 0; escort.vy = 0;
+  }
+  escort.x += escort.vx*dt;
+  escort.y += escort.vy*dt;
+
+  // engage the nearest pirate in range
+  escort.attacking = false;
+  let best = null, bestDist = ESCORT_RANGE;
+  for(const p of pirates){
+    const d = Math.hypot(p.x-escort.x, p.y-escort.y);
+    if(d < bestDist){ bestDist = d; best = p; }
+  }
+  if(best){
+    escort.angle = Math.atan2(best.y-escort.y, best.x-escort.x);
+    escort.attacking = true;
+    escort.targetX = best.x;
+    escort.targetY = best.y;
+    damagePirate(best, ESCORT_DPS*dt);
+    if(best.hp <= 0) destroyPirate(best);
+  } else {
+    // no pirate nearby — put the laser to work on asteroids once it's earned that capability
+    if(escort.level >= ESCORT_MINE_LEVEL){
+      let bestRock = null, bestRockDist = ESCORT_MINE_RANGE;
+      for(const a of asteroids){
+        const d = Math.hypot(a.x-escort.x, a.y-escort.y);
+        if(d < bestRockDist){ bestRockDist = d; bestRock = a; }
+      }
+      if(bestRock){
+        escort.angle = Math.atan2(bestRock.y-escort.y, bestRock.x-escort.x);
+        escort.attacking = true;
+        escort.targetX = bestRock.x;
+        escort.targetY = bestRock.y;
+        bestRock.hp -= ESCORT_MINE_DPS*dt;
+        if(bestRock.hp <= 0){
+          const idx = asteroids.indexOf(bestRock);
+          if(idx>=0) asteroids.splice(idx,1);
+          breakAsteroid(bestRock, false); // escort's work, not yours — no free combat XP
+        }
+      } else if(dist > 2){
+        escort.angle = Math.atan2(dy,dx);
+      }
+    } else if(dist > 2){
+      escort.angle = Math.atan2(dy,dx);
+    }
+  }
+
+  // ore collection — unlocked at level 50, needs a Mule Bay for cargo space
+  if(escort.level >= ESCORT_COLLECT_LEVEL && escortCargoCapacity() > 0){
+    const escortUsed = Object.values(escort.cargo).reduce((s,v)=>s+v,0);
+    if(escortUsed < escortCargoCapacity()){
+      for(const o of oreChunks){
+        if(o.material === 'darkmatter') continue; // too dense, same rule as the tractor beam
+        const d = Math.hypot(o.x-escort.x, o.y-escort.y);
+        if(d < ESCORT_COLLECT_RANGE){
+          escort.cargo[o.material] = (escort.cargo[o.material]||0) + 1;
+          const idx = oreChunks.indexOf(o);
+          if(idx>=0) oreChunks.splice(idx,1);
+          break; // one pickup per tick keeps this simple and avoids double-splicing
+        }
+      }
+    }
+  }
+
+  // auto-offload — escort hands its cargo to you whenever it's close enough and you have room
+  const escortUsed = Object.values(escort.cargo).reduce((s,v)=>s+v,0);
+  if(escortUsed > 0 && Math.hypot(player.x-escort.x, player.y-escort.y) < 120){
+    for(const mat of Object.keys(escort.cargo)){
+      while(escort.cargo[mat] > 0 && cargoUsed() + ((MATERIALS[mat]&&MATERIALS[mat].cargoWeight)||1) <= cargoCapacity()){
+        escort.cargo[mat]--;
+        player.cargo[mat] = (player.cargo[mat]||0) + 1;
+      }
+      if(escort.cargo[mat] <= 0) delete escort.cargo[mat];
+    }
+  }
+}
+
+/* ============================= MISSILES ============================= */
+function fireMissile(){
+  if(docked) return;
+  if(!player.hasMissileLauncher){
+    toast('No missile launcher installed. Salvage one from a destroyed Frigate.', 'warn');
+    return;
+  }
+  if(missileCooldown > 0) return;
+
+  // the launcher auto-detects the nearest valid target of each kind and picks the right ordnance
+  let dmTarget = null, dmDist = MISSILE_ACQUIRE_RANGE;
+  for(const a of asteroids){
+    if(a.material !== 'darkmatter') continue;
+    const d = Math.hypot(a.x-player.x, a.y-player.y);
+    if(d < dmDist){ dmDist = d; dmTarget = a; }
+  }
+  let shipTarget = null, shipDist = MISSILE_ACQUIRE_RANGE;
+  for(const p of pirates){
+    const d = Math.hypot(p.x-player.x, p.y-player.y);
+    if(d < shipDist){ shipDist = d; shipTarget = p; }
+  }
+
+  let target = null, missileType = null;
+  if(dmTarget && player.dmmAmmo > 0){
+    target = dmTarget; missileType = 'dmm';
+  } else if(shipTarget && player.missileAmmo > 0){
+    target = shipTarget; missileType = 'ship';
+  } else if(dmTarget && !shipTarget){
+    toast('Out of Dark Matter Missiles.', 'warn');
+    return;
+  } else if(shipTarget && !dmTarget){
+    toast('Out of missiles.', 'warn');
+    return;
+  } else if(dmTarget && shipTarget){
+    toast('Out of ammo for both missile types.', 'warn');
+    return;
+  } else {
+    toast('No hostile target in range.', 'warn');
+    return;
+  }
+
+  if(missileType==='dmm'){ player.dmmAmmo--; } else { player.missileAmmo--; }
+  missileCooldown = missileCooldownTime();
+  missileTrackTarget = target;
+  missileTrackTimer = 3;
+  sfxMissileLaunch();
+  missiles.push({
+    x: player.x + Math.cos(player.angle)*20,
+    y: player.y + Math.sin(player.angle)*20,
+    vx: Math.cos(player.angle)*MISSILE_SPEED,
+    vy: Math.sin(player.angle)*MISSILE_SPEED,
+    angle: player.angle,
+    target, type: missileType, life: 0,
+  });
+}
+function updateMissiles(dt){
+  if(missileCooldown > 0) missileCooldown -= dt;
+  if(missileTrackTimer > 0) missileTrackTimer -= dt;
+  for(let i=missiles.length-1;i>=0;i--){
+    const m = missiles[i];
+    m.life += dt;
+    const isDMM = m.type === 'dmm';
+    const targetAlive = isDMM
+      ? (m.target && asteroids.indexOf(m.target) >= 0 && m.target.hp > 0 && m.target.material==='darkmatter')
+      : (m.target && pirates.indexOf(m.target) >= 0 && m.target.hp > 0);
+    if(targetAlive){
+      const dx = m.target.x-m.x, dy = m.target.y-m.y;
+      const desiredAngle = Math.atan2(dy,dx);
+      let diff = desiredAngle - m.angle;
+      while(diff>Math.PI) diff -= Math.PI*2;
+      while(diff<-Math.PI) diff += Math.PI*2;
+      m.angle += Math.max(-MISSILE_TURN_RATE*dt, Math.min(MISSILE_TURN_RATE*dt, diff));
+      m.vx = Math.cos(m.angle)*MISSILE_SPEED;
+      m.vy = Math.sin(m.angle)*MISSILE_SPEED;
+      const dist = Math.hypot(dx,dy);
+      if(dist < 24){
+        if(isDMM){
+          const dmg = m.target.maxHp * DMM_DAMAGE_PCT * (1 + roleBonusPct('weapons'));
+          m.target.hp -= dmg;
+          toast(`Dark Matter Missile impact: ${Math.round(dmg)} dmg`, 'warn');
+          sfxExplosion();
+          if(m.target.hp <= 0){
+            const idx = asteroids.indexOf(m.target);
+            if(idx>=0) asteroids.splice(idx,1);
+            breakAsteroid(m.target, true);
+          }
+          spawnDebris(m.x, m.y, '#a855f7');
+        } else {
+          const dmg = missileDamage();
+          damagePirate(m.target, dmg);
+          toast(`Missile impact: ${Math.round(dmg)} dmg`, 'warn');
+          sfxExplosion();
+          if(m.target.hp <= 0) destroyPirate(m.target);
+          spawnDebris(m.x, m.y, '#ff8a3d');
+        }
+        missiles.splice(i,1);
+        continue;
+      }
+    }
+    m.x += m.vx*dt; m.y += m.vy*dt;
+    if(m.life > MISSILE_LIFE){
+      spawnDebris(m.x, m.y, '#7d8fa0');
+      missiles.splice(i,1);
+    }
+  }
+}
+
+function breakAsteroid(a, awardXp){
+  if(awardXp===undefined) awardXp = true;
+  sfxAsteroidCrack();
+  const isDark = a.material === 'darkmatter';
+  if(a.tier < 2){
+    const childTier = a.tier+1;
+    const n = isDark ? 2 : (2 + Math.floor(Math.random()*2)); // dark matter always splits cleanly in two
+    for(let i=0;i<n;i++){
+      const ang = Math.random()*Math.PI*2;
+      const dist = a.radius*0.5;
+      // composition is only rolled — and revealed — once a fragment reaches the smallest tier
+      const childMaterial = isDark ? 'darkmatter' : (childTier===2 ? pickMaterial() : null);
+      spawnAsteroidField(a.x+Math.cos(ang)*dist, a.y+Math.sin(ang)*dist, childTier, childMaterial, a.vx, a.vy);
+    }
+    if(awardXp) grantXp(isDark ? 45 : 1.1); // dark matter is brutal to crack, so it pays out well even before the final ore
+    spawnDebris(a.x, a.y, isDark ? '#a855f7' : (a.grayTone || '#7a8290'));
+  } else {
+    const mat = MATERIALS[a.material];
+    const rarityXp = 1 + mat.price/20;
+    const n = isDark ? 2 : (2 + Math.floor(Math.random()*3)); // dark matter only ever yields exactly 2 chunks
+    for(let i=0;i<n;i++){
+      const ang = Math.random()*Math.PI*2;
+      const speed = isDark ? 15+Math.random()*15 : 40+Math.random()*50;
+      oreChunks.push({
+        x:a.x, y:a.y,
+        vx:Math.cos(ang)*speed, vy:Math.sin(ang)*speed,
+        material:a.material, life:0,
+      });
+    }
+    if(awardXp) grantXp(rarityXp*1.6);
+    spawnDebris(a.x, a.y, mat.color);
+  }
+}
+
+function spawnDebris(x,y,color){
+  for(let i=0;i<10;i++){
+    const ang = Math.random()*Math.PI*2;
+    const speed = 60+Math.random()*100;
+    particles.push({x,y,vx:Math.cos(ang)*speed,vy:Math.sin(ang)*speed,life:0,maxLife:0.5+Math.random()*0.3,color});
+  }
+}
+
+/* ============================= XP / LEVEL ============================= */
+function grantXp(amount){
+  player.xp += amount;
+  let need = xpToNext(player.level);
+  while(player.xp >= need){
+    player.xp -= need;
+    player.level++;
+    player.hull = hullMax(); // small heal on level
+    toast(`Captain reached Level ${player.level}!`, 'levelup');
+    sfxLevelUp();
+    if(player.level === FACTION_UNLOCK_LEVEL){
+      toast('Faction Relations unlocked at Ceres Anchorage!', 'levelup');
+    }
+    need = xpToNext(player.level);
+  }
+  crew.forEach(c=>{
+    c.xp += amount*0.7;
+    let cneed = xpToNext(c.level);
+    while(c.xp >= cneed){
+      c.xp -= cneed;
+      c.level++;
+      toast(`${c.name} (${ROLES[c.role].name}) leveled up to ${c.level}!`, 'levelup');
+      sfxLevelUp();
+      cneed = xpToNext(c.level);
+    }
+  });
+  if(escort){
+    escort.xp += amount * ESCORT_XP_SHARE;
+    let eneed = escortXpToNext(escort.level);
+    while(escort.xp >= eneed && escort.level < 50){
+      escort.xp -= eneed;
+      escort.level++;
+      toast(`Faction Escort reached Level ${escort.level}!`, 'levelup');
+      sfxLevelUp();
+      if(escort.level === ESCORT_MINE_LEVEL){
+        toast('Escort can now mine nearby asteroids with its own laser!', 'levelup');
+      }
+      if(escort.level === ESCORT_COLLECT_LEVEL){
+        toast('Escort can now collect ore! Install a Mule Bay to give it cargo space.', 'levelup');
+      }
+      eneed = escortXpToNext(escort.level);
+    }
+  }
+}
+
+/* ============================= TOASTS ============================= */
+function toast(msg, cls){
+  const wrap = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (cls?(' '+cls):'');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>el.remove(), 2600);
+}
+
+/* ============================= GAME LOOP ============================= */
+function loop(now){
+  if(!running) return;
+  const dt = Math.min((now-last)/1000, 0.05);
+  last = now;
+  if(!docked && !manifestOpen){
+    update(dt);
+  }
+  render();
+  saveTimer += dt;
+  if(saveTimer > 4){ saveTimer = 0; saveGame(); }
+  requestAnimationFrame(loop);
+}
+
+function update(dt){
+  // rotation
+  const tRate = turnRate();
+  if(keys['a']||keys['arrowleft']) player.angle -= tRate*dt;
+  if(keys['d']||keys['arrowright']) player.angle += tRate*dt;
+
+  // thrust
+  const accel = accelRate();
+  let thrusting = false;
+  if(keys['w']||keys['arrowup']){
+    player.vx += Math.cos(player.angle)*accel*dt;
+    player.vy += Math.sin(player.angle)*accel*dt;
+    thrusting = true;
+  }
+  if(keys['s']||keys['arrowdown']){
+    player.vx -= Math.cos(player.angle)*accel*0.5*dt;
+    player.vy -= Math.sin(player.angle)*accel*0.5*dt;
+  }
+  player.thrusting = thrusting;
+  if(thrusting && !engineSoundOn){ startEngineLoop(); engineSoundOn = true; }
+  if(!thrusting && engineSoundOn){ stopEngineLoop(); engineSoundOn = false; }
+
+  // drag & speed cap
+  player.vx *= 0.992;
+  player.vy *= 0.992;
+  const spd = Math.hypot(player.vx, player.vy);
+  const cap = maxSpeed();
+  if(spd > cap){ player.vx = player.vx/spd*cap; player.vy = player.vy/spd*cap; }
+
+  player.x += player.vx*dt;
+  player.y += player.vy*dt;
+
+  // world bounds - soft push back
+  const margin = 80;
+  if(player.x < margin){ player.x = margin; player.vx *= -0.3; }
+  if(player.x > WORLD-margin){ player.x = WORLD-margin; player.vx *= -0.3; }
+  if(player.y < margin){ player.y = margin; player.vy *= -0.3; }
+  if(player.y > WORLD-margin){ player.y = WORLD-margin; player.vy *= -0.3; }
+
+  // dock check
+  dockable = false;
+  if(zone === 'normal'){
+    const distToStation = Math.hypot(player.x-STATION.x, player.y-STATION.y);
+    dockable = distToStation < STATION.dockRadius;
+  }
+  gateReady = false;
+  if(stargate && zone !== 'nebula'){
+    const distToGate = Math.hypot(player.x-stargate.x, player.y-stargate.y);
+    gateReady = distToGate < stargate.radius;
+  }
+  nebulaGateReady = false;
+  if(nebulaGate && zone !== 'normal'){
+    const distToNebulaGate = Math.hypot(player.x-nebulaGate.x, player.y-nebulaGate.y);
+    nebulaGateReady = distToNebulaGate < nebulaGate.radius;
+  }
+  outpostDockable = false;
+  if(zone === 'deep'){
+    const distToOutpost = Math.hypot(player.x-OUTPOST_POS.x, player.y-OUTPOST_POS.y);
+    outpostDockable = distToOutpost < OUTPOST_DOCK_RADIUS;
+  }
+  updatePrompt();
+
+  // laser targeting
+  laserTarget = null;
+  laserTargetType = null;
+  const canFire = firing && player.energy > 0.05;
+  if(canFire && !laserSoundOn){ startLaserLoop(); laserSoundOn = true; }
+  if(!canFire && laserSoundOn){ stopLaserLoop(); laserSoundOn = false; }
+  if(canFire){
+    player.energy = Math.max(0, player.energy - LASER_ENERGY_COST*dt);
+    const range = laserRange();
+    const coneHalf = 0.32;
+    let best = null, bestDist = Infinity, bestType = null;
+    for(const a of asteroids){
+      const dx = a.x-player.x, dy = a.y-player.y;
+      const dist = Math.hypot(dx,dy);
+      if(dist > range) continue;
+      let ang = Math.atan2(dy,dx) - player.angle;
+      while(ang > Math.PI) ang -= Math.PI*2;
+      while(ang < -Math.PI) ang += Math.PI*2;
+      if(Math.abs(ang) > coneHalf) continue;
+      if(dist < bestDist){ bestDist = dist; best = a; bestType = 'asteroid'; }
+    }
+    for(const p of pirates){
+      const dx = p.x-player.x, dy = p.y-player.y;
+      const dist = Math.hypot(dx,dy);
+      if(dist > range) continue;
+      let ang = Math.atan2(dy,dx) - player.angle;
+      while(ang > Math.PI) ang -= Math.PI*2;
+      while(ang < -Math.PI) ang += Math.PI*2;
+      if(Math.abs(ang) > coneHalf) continue;
+      if(dist < bestDist){ bestDist = dist; best = p; bestType = 'pirate'; }
+    }
+    if(best){
+      laserTarget = best;
+      laserTargetType = bestType;
+      const proximityMult = laserProximityMultiplier(bestDist, range);
+      laserProximityMult = proximityMult;
+      if(bestType==='asteroid'){
+        best.hp -= laserDamage()*proximityMult*dt;
+        if(best.hp <= 0){
+          asteroids.splice(asteroids.indexOf(best),1);
+          breakAsteroid(best);
+        }
+      } else {
+        damagePirate(best, laserDamage()*proximityMult*dt);
+        if(best.hp <= 0) destroyPirate(best);
+      }
+    }
+  } else if(firing && player.energy <= 0.05){
+    if(energyWarnCooldown<=0){ toast('Energy depleted — laser offline', 'warn'); sfxLowEnergy(); energyWarnCooldown = 4; }
+  }
+  energyWarnCooldown -= dt;
+  if(hitSoundCooldown>0) hitSoundCooldown -= dt;
+
+  // asteroid movement + bounds
+  for(const a of asteroids){
+    a.x += a.vx*dt; a.y += a.vy*dt;
+    a.rot += a.rotSpeed*dt;
+    if(a.x<0||a.x>WORLD) a.vx*=-1;
+    if(a.y<0||a.y>WORLD) a.vy*=-1;
+    a.vx *= 0.999; a.vy *= 0.999;
+  }
+  if(zone === 'normal'){
+    ensureAsteroidPopulation(false);
+    ensureDarkMatterPopulation();
+  } else if(zone === 'deep'){
+    ensureDeepAsteroidPopulation(false);
+  } else if(zone === 'nebula'){
+    ensureGasCloudPopulation();
+  }
+
+  // collisions with asteroids (hull damage)
+  for(let i=asteroids.length-1;i>=0;i--){
+    const a = asteroids[i];
+    const dx = a.x-player.x, dy = a.y-player.y;
+    const dist = Math.hypot(dx,dy);
+    if(dist < a.radius*0.8 + 10){
+      const dmg = 3 + a.radius*0.12;
+      applyDamage(dmg*dt*6);
+      const push = 220;
+      player.vx -= (dx/dist)*push*dt;
+      player.vy -= (dy/dist)*push*dt;
+      if(msgCooldown<=0){ toast('Hull impact! Watch your approach.', 'warn'); msgCooldown = 2.5; }
+    }
+  }
+  msgCooldown -= dt;
+  player.hull = Math.max(0, Math.min(hullMax(), player.hull));
+
+  // pirates
+  updatePirates(dt);
+
+  // faction escort ally
+  updateEscort(dt);
+
+  // player missiles
+  updateMissiles(dt);
+
+  // shield regen — pauses briefly after any hit, then recovers
+  if(player.shieldLevel>0){
+    if(shieldRegenCooldown>0){ shieldRegenCooldown -= dt; }
+    else { player.shield = Math.min(shieldMax(), player.shield + shieldRegenRate()*dt); }
+  }
+
+  // tractor beam
+  const tractorOn = player.tractorLevel > 0 && (keys['shift']||keys['control']) && player.energy > 0.05;
+  const scoopOn = player.hasRamScoop && (keys['shift']||keys['control']) && player.energy > 0.05;
+  if((tractorOn||scoopOn) && !tractorSoundOn){ startTractorLoop(); tractorSoundOn = true; }
+  if(!tractorOn && !scoopOn && tractorSoundOn){ stopTractorLoop(); tractorSoundOn = false; }
+  tractorTargets = [];
+  if(tractorOn){
+    player.energy = Math.max(0, player.energy - TRACTOR_ENERGY_COST*dt);
+    const range = tractorRange(), strength = tractorStrength();
+    for(const o of oreChunks){
+      if(o.material === 'darkmatter') continue; // too dense for the tractor beam to budge
+      const dx = player.x-o.x, dy = player.y-o.y;
+      const dist = Math.hypot(dx,dy);
+      if(dist > 4 && dist < range){
+        o.vx += (dx/dist)*strength*dt;
+        o.vy += (dy/dist)*strength*dt;
+        tractorTargets.push(o);
+      }
+    }
+  }
+  scoopTargets = [];
+  if(scoopOn){
+    player.energy = Math.max(0, player.energy - RAM_SCOOP_ENERGY_COST*dt);
+    const rate = RAM_SCOOP_EXTRACT_RATE * (1 + roleBonusPct('gastech'));
+    const tankCap = gasTankCapacity();
+    for(let i=gasClouds.length-1;i>=0;i--){
+      const cloud = gasClouds[i];
+      const d = Math.hypot(cloud.x-player.x, cloud.y-player.y);
+      if(d < cloud.radius){
+        const weight = MATERIALS[cloud.material].cargoWeight||1;
+        if(gasUsed() + weight > tankCap){
+          // tank is full for this gas — don't waste the cloud's volume extracting into nothing
+          if(gasTankWarnCooldown<=0){ toast('Gas tank full — nothing more to scoop.', 'warn'); gasTankWarnCooldown = 3; }
+          continue;
+        }
+        const amt = Math.min(rate*dt, cloud.volume);
+        cloud.volume -= amt;
+        player.gasBuffer[cloud.material] = (player.gasBuffer[cloud.material]||0) + amt;
+        while(player.gasBuffer[cloud.material] >= 1 && gasUsed() + weight <= tankCap){
+          player.cargo[cloud.material] = (player.cargo[cloud.material]||0) + 1;
+          player.gasBuffer[cloud.material] -= 1;
+        }
+        scoopTargets.push(cloud);
+        if(cloud.volume <= 0){ gasClouds.splice(i,1); }
+      }
+    }
+  }
+  if(gasTankWarnCooldown>0) gasTankWarnCooldown -= dt;
+  if(cargoFullWarnCooldown>0) cargoFullWarnCooldown -= dt;
+
+  // ore chunk movement + collection
+  for(let i=oreChunks.length-1;i>=0;i--){
+    const o = oreChunks[i];
+    o.life += dt;
+    o.x += o.vx*dt; o.y += o.vy*dt;
+    o.vx *= tractorOn ? 0.9 : 0.96;
+    o.vy *= tractorOn ? 0.9 : 0.96;
+    const dist = Math.hypot(o.x-player.x, o.y-player.y);
+    const chunkWeight = (MATERIALS[o.material]&&MATERIALS[o.material].cargoWeight)||1;
+    const lifeLimit = o.material==='darkmatter' ? 300 : 40;
+    if(dist < 26){
+      if(cargoUsed() + chunkWeight <= cargoCapacity()){
+        player.cargo[o.material] = (player.cargo[o.material]||0) + 1;
+        sfxOreCollect();
+        if(o.material==='darkmatter'){
+          quest.darkMatterCollected++;
+          checkQuestCompletion();
+        }
+        oreChunks.splice(i,1);
+      } else if(cargoFullWarnCooldown<=0){
+        toast('Cargo hold full — sell or smelt before collecting more.', 'warn');
+        cargoFullWarnCooldown = 3;
+      }
+    } else if(o.life > lifeLimit){
+      oreChunks.splice(i,1);
+    }
+  }
+
+  // particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.life += dt;
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.vx *= 0.9; p.vy *= 0.9;
+    if(p.life > p.maxLife) particles.splice(i,1);
+  }
+
+  // energy regen — recharges slowly while systems are running, much faster once you let off
+  const systemsActive = canFire || tractorOn;
+  const regenRate = systemsActive ? energyRegen()*0.4 : energyRegen()*2.4;
+  player.energy = Math.min(energyMax(), player.energy + regenRate*dt);
+  energyCharging = !systemsActive && player.energy < energyMax();
+
+  camera.x = player.x - W/2;
+  camera.y = player.y - H/2;
+
+  updateHUD();
+}
+
+function updatePrompt(){
+  const el = document.getElementById('prompt');
+  if(dockable && !docked){
+    el.style.display = 'block';
+    el.textContent = 'Press E to dock at Ceres Anchorage';
+  } else if(outpostDockable && !docked){
+    el.style.display = 'block';
+    el.textContent = 'Press E to dock at the Black Market Relay';
+  } else if(gateReady){
+    el.style.display = 'block';
+    el.textContent = zone==='normal' ? 'Press E to activate Stargate — warp to Deep Zone' : 'Press E to activate Stargate — warp home';
+  } else if(nebulaGateReady){
+    el.style.display = 'block';
+    el.textContent = zone==='nebula' ? 'Press E to activate Stargate — warp to Deep Zone' : 'Press E to activate Stargate — warp to the Nebula';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function tryDock(){
+  if(dockable && !docked){
+    docked = true;
+    player.energy = energyMax();
+    stopLaserLoop(); laserSoundOn = false;
+    stopTractorLoop(); tractorSoundOn = false;
+    stopEngineLoop(); engineSoundOn = false;
+    sfxDock();
+    openStation();
+    return;
+  }
+  if(outpostDockable && !docked){
+    docked = true;
+    player.energy = energyMax();
+    stopLaserLoop(); laserSoundOn = false;
+    stopTractorLoop(); tractorSoundOn = false;
+    stopEngineLoop(); engineSoundOn = false;
+    sfxDock();
+    openOutpost();
+    return;
+  }
+  if(gateReady){
+    warpZone();
+    return;
+  }
+  if(nebulaGateReady){
+    warpNebula();
+  }
+}
+
+/* ============================= RENDER ============================= */
+function render(){
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(0,0,W,H);
+
+  // stars
+  for(const s of stars){
+    const sx = s.x - camera.x*s.depth - (STATION.x*(s.depth-1))*0;
+    const sy = s.y - camera.y*s.depth;
+    const px = ((sx % (WORLD*1.4)) + WORLD*1.4) % (WORLD*1.4) - WORLD*0.2 - camera.x*(s.depth-1);
+    // simpler parallax: just offset by camera*depth directly
+    const dx = s.x - camera.x*s.depth;
+    const dy = s.y - camera.y*s.depth;
+    const wx = ((dx % W) + W) % W;
+    const wy = ((dy % H) + H) % H;
+    const flicker = 0.6 + 0.4*Math.sin(s.tw + performance.now()*0.001);
+    ctx.globalAlpha = flicker*0.8;
+    ctx.fillStyle = '#cfe8ff';
+    ctx.beginPath();
+    ctx.arc(wx, wy, s.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // station
+  if(zone === 'normal') drawStation();
+  if(zone === 'deep') drawOutpost();
+  if(zone !== 'nebula' && stargate) drawStargate();
+  if(zone !== 'normal' && nebulaGate) drawNebulaGate();
+
+  // gas clouds — drawn as a soft backdrop layer, behind ore chunks and asteroids
+  for(const cloud of gasClouds){
+    const sx = cloud.x-camera.x, sy = cloud.y-camera.y;
+    if(sx<-cloud.radius-50||sx>W+cloud.radius+50||sy<-cloud.radius-50||sy>H+cloud.radius+50) continue;
+    const col = MATERIALS[cloud.material].color;
+    const volFrac = Math.max(0, cloud.volume/cloud.maxVolume);
+    const dispRadius = cloud.radius * (0.3 + 0.7*volFrac); // visibly shrinks as it depletes
+    const fade = Math.max(0.2, volFrac);
+    const pulse = 0.85 + 0.15*Math.sin(performance.now()*0.0006 + cloud.driftPhase);
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.globalAlpha = 0.16*fade*pulse;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(0,0,dispRadius,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 0.28*fade*pulse;
+    ctx.beginPath(); ctx.arc(dispRadius*0.25,-dispRadius*0.15,dispRadius*0.6,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-dispRadius*0.3,dispRadius*0.2,dispRadius*0.5,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = col;
+    ctx.fillText(MATERIALS[cloud.material].name, 0, -dispRadius-14);
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.fillText(`${Math.round(cloud.volume)}/${Math.round(cloud.maxVolume)}`, 0, -dispRadius-3);
+    ctx.restore();
+  }
+
+  // ram scoop extraction beams
+  if(scoopTargets.length){
+    const px = player.x-camera.x, py = player.y-camera.y;
+    ctx.save();
+    for(const cloud of scoopTargets){
+      const col = MATERIALS[cloud.material].color;
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = 0.4 + 0.25*Math.sin(performance.now()*0.01);
+      ctx.lineWidth = 2;
+      ctx.shadowColor = col; ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(px,py);
+      ctx.lineTo(cloud.x-camera.x, cloud.y-camera.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // ore chunks
+  for(const o of oreChunks){
+    const sx = o.x-camera.x, sy = o.y-camera.y;
+    if(sx<-30||sx>W+30||sy<-30||sy>H+30) continue;
+    const isDarkChunk = o.material === 'darkmatter';
+    const isGem = !!MATERIALS[o.material].gem;
+    const col = MATERIALS[o.material].color;
+    const glow = 0.6+0.4*Math.sin(performance.now()*0.004 + o.x);
+    const sizeMul = isDarkChunk ? 1.8 : (isGem ? 1.25 : 1);
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.shadowColor = col; ctx.shadowBlur = (isDarkChunk?18:(isGem?14:10))*glow;
+    ctx.fillStyle = isDarkChunk ? '#07030c' : col;
+    ctx.beginPath();
+    ctx.moveTo(0,-6*sizeMul); ctx.lineTo(5*sizeMul,0); ctx.lineTo(0,6*sizeMul); ctx.lineTo(-5*sizeMul,0); ctx.closePath();
+    ctx.fill();
+    if(isDarkChunk){
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = col;
+      ctx.stroke();
+    }
+    if(isGem){
+      // twinkling four-point sparkle so gems read as extra special from a distance
+      const twinkle = 0.4 + 0.6*Math.max(0, Math.sin(performance.now()*0.006 + o.x*0.7));
+      ctx.globalAlpha = twinkle;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-9,0); ctx.lineTo(9,0);
+      ctx.moveTo(0,-9); ctx.lineTo(0,9);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  // asteroids
+  for(const a of asteroids){
+    const sx = a.x-camera.x, sy = a.y-camera.y;
+    if(sx<-80||sx>W+80||sy<-80||sy>H+80) continue;
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.rotate(a.rot);
+    ctx.beginPath();
+    a.shape.forEach((p,i)=>{
+      const x = Math.cos(p.a)*p.r, y = Math.sin(p.a)*p.r;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.closePath();
+    const isDark = a.material === 'darkmatter';
+    const col = isDark ? '#a855f7' : (a.material ? MATERIALS[a.material].color : a.grayTone);
+    if(isDark){
+      ctx.fillStyle = '#07030c';
+      ctx.fill();
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = col;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = shade(col, -0.55);
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = col;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if(isDark){
+      const pulse = 0.5 + 0.5*Math.sin(performance.now()*0.0012 + a.x);
+      ctx.save();
+      ctx.strokeStyle = `rgba(168,85,247,${0.12+0.15*pulse})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, a.radius*1.5, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // hp bar if damaged
+    if(a.hp < a.maxHp){
+      const w = a.radius*1.6;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(sx-w/2, sy-a.radius-12, w, 4);
+      ctx.fillStyle = col;
+      ctx.fillRect(sx-w/2, sy-a.radius-12, w*Math.max(0,a.hp/a.maxHp), 4);
+    }
+
+    // scanner ID readout — only meaningful once composition is revealed at the smallest tier
+    if(a.material && scannerCanID(a)){
+      const label = MATERIALS[a.material].symbol;
+      ctx.save();
+      ctx.font = 'bold 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = 'rgba(5,7,12,.7)';
+      ctx.fillRect(sx-tw/2-5, sy-6, tw+10, 13);
+      ctx.strokeStyle = 'rgba(79,224,208,.35)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(sx-tw/2-5, sy-6, tw+10, 13);
+      ctx.fillStyle = col;
+      ctx.fillText(label, sx, sy+1);
+      ctx.restore();
+    } else if(!a.material && player.scannerLevel>0 && scannerCanID(a)){
+      // scanner active but composition not yet determinable
+      ctx.save();
+      ctx.font = 'bold 10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(125,143,160,.7)';
+      ctx.fillText('?', sx, sy-a.radius-4);
+      ctx.restore();
+    }
+  }
+
+  // particles
+  for(const p of particles){
+    const sx = p.x-camera.x, sy = p.y-camera.y;
+    ctx.globalAlpha = Math.max(0,1-p.life/p.maxLife);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(sx,sy,2,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // pirates
+  for(const p of pirates){
+    const sx = p.x-camera.x, sy = p.y-camera.y;
+    if(sx<-90||sx>W+90||sy<-90||sy>H+90) continue;
+    const scale = p.isCorvette ? CORVETTE_SCALE : (p.isFrigate ? 1.6 : 1);
+    const shielded = (p.isFrigate || p.isCorvette) && p.shieldMax>0;
+    const hullCol = p.isCorvette ? '#c9d6de' : (p.isFrigate ? '#ff6a3d' : '#e0546b');
+    const fillCol = p.isCorvette ? '#232b33' : (p.isFrigate ? '#3a2010' : '#3a1620');
+    const label = p.isCorvette ? 'CORV' : (p.isFrigate ? 'HULL' : '');
+
+    if(shielded && p.shield>0){
+      ctx.save();
+      ctx.translate(sx,sy);
+      ctx.strokeStyle = `rgba(168,85,247,${0.3+0.25*Math.sin(performance.now()*0.003)})`;
+      ctx.shadowColor = '#a855f7'; ctx.shadowBlur = 8;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(0,0,22*scale,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.rotate(p.angle);
+    ctx.fillStyle = fillCol;
+    ctx.strokeStyle = hullCol;
+    ctx.lineWidth = p.isCorvette ? 2.4 : (p.isFrigate ? 2 : 1.5);
+    ctx.beginPath();
+    if(p.isCorvette){
+      // hexagon hull — visibly distinct from the arrow-shaped pirates/frigates
+      for(let i=0;i<6;i++){
+        const a = (i/6)*Math.PI*2;
+        const vx = Math.cos(a)*13*scale, vy = Math.sin(a)*10*scale;
+        if(i===0) ctx.moveTo(vx,vy); else ctx.lineTo(vx,vy);
+      }
+    } else {
+      ctx.moveTo(14*scale,0);
+      ctx.lineTo(-9*scale,7*scale);
+      ctx.lineTo(-3*scale,0);
+      ctx.lineTo(-9*scale,-7*scale);
+    }
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // shield readout (shielded ships only)
+    if(shielded){
+      const w = p.isCorvette ? 48 : 40;
+      const barY = p.isCorvette ? sy-46 : sy-40;
+      const shieldPct = p.shieldMax>0 ? Math.max(0,p.shield/p.shieldMax) : 0;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(sx-w/2, barY, w, 4);
+      ctx.fillStyle = '#a855f7';
+      ctx.fillRect(sx-w/2, barY, w*shieldPct, 4);
+      ctx.fillStyle = '#d9b8ff';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`SH ${Math.max(0,Math.ceil(p.shield))}/${p.shieldMax}`, sx, barY-4);
+    }
+
+    // hull bar
+    {
+      const w = p.isCorvette ? 48 : (p.isFrigate ? 40 : 34);
+      const barY = p.isCorvette ? sy-36 : (p.isFrigate ? sy-32 : sy-26);
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(sx-w/2, barY, w, 4);
+      const hpPct = Math.max(0,p.hp/p.maxHp);
+      ctx.fillStyle = hpPct > 0.4 ? hullCol : '#ff8a5c';
+      ctx.fillRect(sx-w/2, barY, w*hpPct, 4);
+      ctx.fillStyle = p.isCorvette ? '#c9d6de' : '#f0a8b2';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${label?label+' ':''}${Math.max(0,Math.ceil(p.hp))}/${p.maxHp}`, sx, barY-4);
+    }
+
+    if(p.attacking){
+      const px = player.x-camera.x, py = player.y-camera.y;
+      const targetX = p.blockedTargetX!==null ? p.blockedTargetX-camera.x : px;
+      const targetY = p.blockedTargetY!==null ? p.blockedTargetY-camera.y : py;
+      ctx.save();
+      ctx.strokeStyle = p.isCorvette ? 'rgba(201,214,222,.75)' : (p.isFrigate ? 'rgba(255,106,61,.75)' : 'rgba(224,84,107,.7)');
+      ctx.shadowColor = hullCol; ctx.shadowBlur = 8;
+      ctx.lineWidth = (p.isCorvette?2.6:(p.isFrigate?2.2:1.6)) + Math.sin(performance.now()*0.04);
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(targetX,targetY); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // laser beam
+  if(firing && laserTarget){
+    const px = player.x-camera.x, py = player.y-camera.y;
+    const tx = laserTarget.x-camera.x, ty = laserTarget.y-camera.y;
+    const beamColor = laserTargetType==='pirate' ? '#ff5a6e' : '#f2a154';
+    ctx.save();
+    ctx.strokeStyle = beamColor;
+    ctx.shadowColor = beamColor; ctx.shadowBlur = 12;
+    ctx.lineWidth = 2 + Math.sin(performance.now()*0.03);
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(tx,ty); ctx.stroke();
+    ctx.restore();
+  } else if(firing){
+    const px = player.x-camera.x, py = player.y-camera.y;
+    const range = laserRange();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(242,161,84,.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px,py);
+    ctx.lineTo(px+Math.cos(player.angle)*range, py+Math.sin(player.angle)*range);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // tractor beam
+  if(tractorTargets.length){
+    const px = player.x-camera.x, py = player.y-camera.y;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(79,224,208,.55)';
+    ctx.lineWidth = 1.4;
+    ctx.shadowColor = '#4fe0d0'; ctx.shadowBlur = 6;
+    for(const o of tractorTargets){
+      ctx.beginPath();
+      ctx.moveTo(px,py);
+      ctx.lineTo(o.x-camera.x, o.y-camera.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // player missiles
+  for(const m of missiles){
+    const mx = m.x-camera.x, my = m.y-camera.y;
+    if(mx<-40||mx>W+40||my<-40||my>H+40) continue;
+    const isDMM = m.type === 'dmm';
+    const trailCol = isDMM ? 'rgba(168,85,247,.55)' : 'rgba(255,138,61,.55)';
+    const bodyCol = isDMM ? '#d9b8ff' : '#ffb27a';
+    const glowCol = isDMM ? '#a855f7' : '#ff8a3d';
+    ctx.save();
+    ctx.translate(mx,my);
+    ctx.rotate(m.angle);
+    // exhaust trail
+    ctx.fillStyle = trailCol;
+    ctx.beginPath();
+    ctx.moveTo(-6,-2); ctx.lineTo(-16,0); ctx.lineTo(-6,2);
+    ctx.closePath(); ctx.fill();
+    // body
+    ctx.fillStyle = bodyCol;
+    ctx.shadowColor = glowCol; ctx.shadowBlur = isDMM ? 11 : 8;
+    ctx.beginPath();
+    ctx.moveTo(8,0); ctx.lineTo(-4,3); ctx.lineTo(-4,-3);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // faction escort
+  if(escort){
+    const esx = escort.x-camera.x, esy = escort.y-camera.y;
+    ctx.save();
+    ctx.translate(esx,esy);
+    ctx.rotate(escort.angle);
+    ctx.fillStyle = '#16323a';
+    ctx.strokeStyle = '#4fe0d0';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = '#4fe0d0'; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(13,0);
+    ctx.lineTo(-8,6);
+    ctx.lineTo(-3,0);
+    ctx.lineTo(-8,-6);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    if(escort.attacking){
+      ctx.save();
+      ctx.strokeStyle = 'rgba(79,224,208,.7)';
+      ctx.shadowColor = '#4fe0d0'; ctx.shadowBlur = 8;
+      ctx.lineWidth = 1.6 + Math.sin(performance.now()*0.04);
+      ctx.beginPath();
+      ctx.moveTo(esx,esy);
+      ctx.lineTo(escort.targetX-camera.x, escort.targetY-camera.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = escort.level>=ESCORT_COLLECT_LEVEL ? '#f2a154' : (escort.level>=ESCORT_MINE_LEVEL ? '#4fe0d0' : 'rgba(79,224,208,.55)');
+    ctx.fillText(`Lv${escort.level}`, esx, esy-18);
+    ctx.restore();
+  }
+
+  // ship
+  drawShip();
+
+  drawRadar();
+}
+
+function drawRadar(){
+  const R = 65, cx = 70, cy = 70;
+  const range = 1500; // world units shown at radar edge
+  radarCtx.clearRect(0,0,140,140);
+
+  // background rings
+  radarCtx.save();
+  radarCtx.translate(cx,cy);
+  radarCtx.strokeStyle = 'rgba(79,224,208,.18)';
+  radarCtx.lineWidth = 1;
+  [0.33,0.66,1].forEach(f=>{
+    radarCtx.beginPath(); radarCtx.arc(0,0,R*f,0,Math.PI*2); radarCtx.stroke();
+  });
+  radarCtx.beginPath(); radarCtx.moveTo(-R,0); radarCtx.lineTo(R,0);
+  radarCtx.moveTo(0,-R); radarCtx.lineTo(0,R); radarCtx.stroke();
+
+  // asteroid blips (nearest ~40, dimmed by material color)
+  for(const a of asteroids){
+    const dx = a.x-player.x, dy = a.y-player.y;
+    const dist = Math.hypot(dx,dy);
+    if(dist > range) continue;
+    const rx = (dx/range)*R, ry = (dy/range)*R;
+    radarCtx.fillStyle = a.material ? MATERIALS[a.material].color : (a.grayTone || '#7a8290');
+    radarCtx.globalAlpha = 0.75;
+    radarCtx.beginPath(); radarCtx.arc(rx,ry,1.6,0,Math.PI*2); radarCtx.fill();
+  }
+  radarCtx.globalAlpha = 1;
+
+  // dark matter deposits — always visible on radar if the Deep Space Charts perk is owned
+  if(player.factionPerks && player.factionPerks.darkMatterCharts){
+    for(const a of asteroids){
+      if(a.material !== 'darkmatter' || a.tier !== 0) continue;
+      const dx = a.x-player.x, dy = a.y-player.y;
+      const dist = Math.hypot(dx,dy);
+      const ang = Math.atan2(dy,dx);
+      const clamped = Math.min(dist, range*0.9);
+      const rx = Math.cos(ang)*(clamped/range)*R, ry = Math.sin(ang)*(clamped/range)*R;
+      radarCtx.fillStyle = '#a855f7';
+      radarCtx.shadowColor = '#a855f7'; radarCtx.shadowBlur = 6;
+      radarCtx.beginPath(); radarCtx.arc(rx,ry,3.2,0,Math.PI*2); radarCtx.fill();
+      radarCtx.shadowBlur = 0;
+    }
+  }
+
+  // pirate blips
+  for(const p of pirates){
+    const dx = p.x-player.x, dy = p.y-player.y;
+    const dist = Math.hypot(dx,dy);
+    if(dist > range) continue;
+    const rx = (dx/range)*R, ry = (dy/range)*R;
+    radarCtx.fillStyle = p.state==='chase' ? '#ff5a6e' : 'rgba(224,84,107,.6)';
+    radarCtx.beginPath(); radarCtx.arc(rx,ry,2.3,0,Math.PI*2); radarCtx.fill();
+  }
+
+  // station blip - clamp to edge if beyond range, with direction arrow (normal zone only)
+  let sdist = null;
+  if(zone==='normal'){
+    const sdx = STATION.x-player.x, sdy = STATION.y-player.y;
+    sdist = Math.hypot(sdx,sdy);
+    const ang = Math.atan2(sdy,sdx);
+    const clamped = Math.min(sdist, range*0.94);
+    const bx = Math.cos(ang)*(clamped/range)*R;
+    const by = Math.sin(ang)*(clamped/range)*R;
+    radarCtx.fillStyle = '#4fe0d0';
+    radarCtx.shadowColor = '#4fe0d0'; radarCtx.shadowBlur = 6;
+    radarCtx.beginPath(); radarCtx.arc(bx,by,4,0,Math.PI*2); radarCtx.fill();
+    radarCtx.shadowBlur = 0;
+    if(sdist > range){
+      radarCtx.save();
+      radarCtx.translate(bx,by);
+      radarCtx.rotate(ang);
+      radarCtx.fillStyle = '#4fe0d0';
+      radarCtx.beginPath();
+      radarCtx.moveTo(8,0); radarCtx.lineTo(2,-4); radarCtx.lineTo(2,4);
+      radarCtx.closePath(); radarCtx.fill();
+      radarCtx.restore();
+    }
+  }
+
+  // stargate blip — visible in normal/deep zones once it exists
+  let gdist = null;
+  if(stargate && zone !== 'nebula'){
+    const gdx = stargate.x-player.x, gdy = stargate.y-player.y;
+    gdist = Math.hypot(gdx,gdy);
+    const gang = Math.atan2(gdy,gdx);
+    const gclamped = Math.min(gdist, range*0.9);
+    const gbx = Math.cos(gang)*(gclamped/range)*R, gby = Math.sin(gang)*(gclamped/range)*R;
+    radarCtx.fillStyle = '#6366f1';
+    radarCtx.shadowColor = '#6366f1'; radarCtx.shadowBlur = 6;
+    radarCtx.beginPath(); radarCtx.arc(gbx,gby,3.5,0,Math.PI*2); radarCtx.fill();
+    radarCtx.shadowBlur = 0;
+  }
+
+  // nebula gate blip — visible in deep/nebula zones once it exists
+  let ngdist = null;
+  if(nebulaGate && zone !== 'normal'){
+    const ngdx = nebulaGate.x-player.x, ngdy = nebulaGate.y-player.y;
+    ngdist = Math.hypot(ngdx,ngdy);
+    const ngang = Math.atan2(ngdy,ngdx);
+    const ngclamped = Math.min(ngdist, range*0.9);
+    const ngbx = Math.cos(ngang)*(ngclamped/range)*R, ngby = Math.sin(ngang)*(ngclamped/range)*R;
+    radarCtx.fillStyle = '#4fe0d0';
+    radarCtx.shadowColor = '#4fe0d0'; radarCtx.shadowBlur = 6;
+    radarCtx.beginPath(); radarCtx.arc(ngbx,ngby,3.5,0,Math.PI*2); radarCtx.fill();
+    radarCtx.shadowBlur = 0;
+  }
+
+  // gas cloud blips — nebula zone only
+  if(zone === 'nebula'){
+    for(const cloud of gasClouds){
+      const cdx = cloud.x-player.x, cdy = cloud.y-player.y;
+      const cdist = Math.hypot(cdx,cdy);
+      if(cdist > range) continue;
+      const crx = (cdx/range)*R, cry = (cdy/range)*R;
+      radarCtx.fillStyle = MATERIALS[cloud.material].color;
+      radarCtx.globalAlpha = 0.7;
+      radarCtx.beginPath(); radarCtx.arc(crx,cry,2.4,0,Math.PI*2); radarCtx.fill();
+    }
+    radarCtx.globalAlpha = 1;
+  }
+
+  // outpost blip — deep zone only
+  let odist = null;
+  if(zone === 'deep'){
+    const odx = OUTPOST_POS.x-player.x, ody = OUTPOST_POS.y-player.y;
+    odist = Math.hypot(odx,ody);
+    const oang = Math.atan2(ody,odx);
+    const oclamped = Math.min(odist, range*0.94);
+    const obx = Math.cos(oang)*(oclamped/range)*R, oby = Math.sin(oang)*(oclamped/range)*R;
+    radarCtx.fillStyle = '#f2a154';
+    radarCtx.shadowColor = '#f2a154'; radarCtx.shadowBlur = 6;
+    radarCtx.beginPath(); radarCtx.arc(obx,oby,4,0,Math.PI*2); radarCtx.fill();
+    radarCtx.shadowBlur = 0;
+  }
+
+  // player marker at center, oriented to facing angle
+  radarCtx.save();
+  radarCtx.rotate(player.angle);
+  radarCtx.fillStyle = '#f2a154';
+  radarCtx.beginPath();
+  radarCtx.moveTo(6,0); radarCtx.lineTo(-4,3.5); radarCtx.lineTo(-4,-3.5);
+  radarCtx.closePath(); radarCtx.fill();
+  radarCtx.restore();
+
+  radarCtx.restore();
+
+  if(zone==='normal'){
+    document.getElementById('radar-dist').textContent = `Station: ${Math.round(sdist)}m`;
+  } else if(zone==='deep'){
+    document.getElementById('radar-dist').textContent = odist!==null ? `Relay: ${Math.round(odist)}m` : 'Deep Zone';
+  } else {
+    document.getElementById('radar-dist').textContent = ngdist!==null ? `Gate: ${Math.round(ngdist)}m` : 'The Nebula';
+  }
+}
+
+function shade(hex, amt){
+  const c = parseInt(hex.slice(1),16);
+  let r = (c>>16)&255, g=(c>>8)&255, b=c&255;
+  r = Math.max(0,Math.min(255, r + 255*amt));
+  g = Math.max(0,Math.min(255, g + 255*amt));
+  b = Math.max(0,Math.min(255, b + 255*amt));
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+
+function drawStation(){
+  const sx = STATION.x-camera.x, sy = STATION.y-camera.y;
+  const t = performance.now()*0.0004;
+  ctx.save();
+  ctx.translate(sx,sy);
+  // dock radius ring
+  ctx.strokeStyle = 'rgba(79,224,208,.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0,0,STATION.dockRadius,0,Math.PI*2); ctx.stroke();
+  // outer ring rotating
+  ctx.rotate(t);
+  ctx.strokeStyle = '#4fe0d0';
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(0,0,70,0,Math.PI*1.5); ctx.stroke();
+  ctx.rotate(-t*2);
+  ctx.strokeStyle = '#f2a154';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0,0,48,0,Math.PI*1.2); ctx.stroke();
+  ctx.restore();
+  // core
+  ctx.save();
+  ctx.translate(sx,sy);
+  ctx.fillStyle = '#0d1522';
+  ctx.strokeStyle = '#4fe0d0';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0,0,26,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#4fe0d0';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('CERES', 0, -34);
+  ctx.restore();
+}
+
+function drawOutpost(){
+  const sx = OUTPOST_POS.x-camera.x, sy = OUTPOST_POS.y-camera.y;
+  if(sx<-250||sx>W+250||sy<-250||sy>H+250) return;
+  const t = performance.now()*0.0003;
+  ctx.save();
+  ctx.translate(sx,sy);
+  // dock radius ring
+  ctx.strokeStyle = 'rgba(242,161,84,.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0,0,OUTPOST_DOCK_RADIUS,0,Math.PI*2); ctx.stroke();
+  // asymmetric rotating hull plates — scrappier than the station's clean rings
+  ctx.rotate(t);
+  ctx.strokeStyle = '#f2a154';
+  ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(0,0,62,0.4,Math.PI*1.1); ctx.stroke();
+  ctx.rotate(-t*1.7);
+  ctx.strokeStyle = '#8a5a2c';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(0,0,42,-0.6,Math.PI*0.9); ctx.stroke();
+  ctx.restore();
+  // core
+  ctx.save();
+  ctx.translate(sx,sy);
+  ctx.fillStyle = '#1a140d';
+  ctx.strokeStyle = '#f2a154';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#f2a154';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('RELAY', 0, -30);
+  ctx.restore();
+}
+
+function drawStargate(){
+  const sx = stargate.x-camera.x, sy = stargate.y-camera.y;
+  if(sx<-250||sx>W+250||sy<-250||sy>H+250) return;
+  const t = performance.now()*0.0003;
+  const pulse = 0.6 + 0.4*Math.sin(performance.now()*0.002);
+  ctx.save();
+  ctx.translate(sx,sy);
+  // activation radius ring
+  ctx.strokeStyle = 'rgba(99,102,241,.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0,0,stargate.radius,0,Math.PI*2); ctx.stroke();
+  // rotating outer ring — the "gate" itself
+  ctx.rotate(t);
+  ctx.strokeStyle = '#6366f1';
+  ctx.lineWidth = 7;
+  ctx.shadowColor = '#6366f1'; ctx.shadowBlur = 20*pulse;
+  ctx.beginPath(); ctx.arc(0,0,95,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+  // inner event-horizon shimmer
+  ctx.save();
+  ctx.translate(sx,sy);
+  ctx.fillStyle = `rgba(99,102,241,${0.12+0.1*pulse})`;
+  ctx.beginPath(); ctx.arc(0,0,80,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#d6d9ff';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(zone==='normal' ? 'STARGATE — DEEP ZONE' : 'STARGATE — HOME', 0, -110);
+  ctx.restore();
+}
+
+function drawNebulaGate(){
+  const sx = nebulaGate.x-camera.x, sy = nebulaGate.y-camera.y;
+  if(sx<-250||sx>W+250||sy<-250||sy>H+250) return;
+  const t = performance.now()*0.00025;
+  const pulse = 0.6 + 0.4*Math.sin(performance.now()*0.0022);
+  ctx.save();
+  ctx.translate(sx,sy);
+  ctx.strokeStyle = 'rgba(79,224,208,.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0,0,nebulaGate.radius,0,Math.PI*2); ctx.stroke();
+  ctx.rotate(-t);
+  ctx.strokeStyle = '#4fe0d0';
+  ctx.lineWidth = 7;
+  ctx.shadowColor = '#4fe0d0'; ctx.shadowBlur = 20*pulse;
+  ctx.beginPath(); ctx.arc(0,0,95,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+  ctx.save();
+  ctx.translate(sx,sy);
+  ctx.fillStyle = `rgba(255,143,209,${0.12+0.1*pulse})`;
+  ctx.beginPath(); ctx.arc(0,0,80,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#d4f7f0';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(zone==='nebula' ? 'STARGATE — DEEP ZONE' : 'STARGATE — NEBULA', 0, -110);
+  ctx.restore();
+}
+
+function drawShip(){
+  const sx = player.x-camera.x, sy = player.y-camera.y;
+
+  if(player.shieldLevel>0 && player.shield>0){
+    const pct = player.shield/shieldMax();
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.strokeStyle = `rgba(143,208,242,${0.25+0.35*pct})`;
+    ctx.shadowColor = '#8fd0f2'; ctx.shadowBlur = 10;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(sx,sy);
+  ctx.rotate(player.angle);
+  if(player.thrusting){
+    ctx.fillStyle = 'rgba(242,161,84,.85)';
+    const flick = 8+Math.random()*6;
+    ctx.beginPath();
+    ctx.moveTo(-14,-5); ctx.lineTo(-14-flick,0); ctx.lineTo(-14,5);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#c9d6de';
+  ctx.strokeStyle = '#4fe0d0';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(16,0);
+  ctx.lineTo(-12,9);
+  ctx.lineTo(-6,0);
+  ctx.lineTo(-12,-9);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  if(player.hasRamScoop){
+    // twin pylons mounted on either side, angled back from the hull
+    ctx.fillStyle = '#3a5a52';
+    ctx.strokeStyle = '#4fe0d0';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(2,7); ctx.lineTo(-10,15); ctx.lineTo(-14,12); ctx.lineTo(-4,6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(2,-7); ctx.lineTo(-10,-15); ctx.lineTo(-14,-12); ctx.lineTo(-4,-6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/* ============================= HUD UPDATE ============================= */
+function updateHUD(){
+  const hm = hullMax();
+  document.getElementById('hull-txt').textContent = `${Math.ceil(player.hull)}/${hm}`;
+  document.getElementById('hull-bar').style.width = `${Math.max(0,player.hull/hm*100)}%`;
+
+  const shieldRow = document.getElementById('shield-row');
+  const shieldWrap = document.getElementById('shield-barwrap');
+  if(player.shieldLevel>0){
+    shieldRow.style.display = 'flex';
+    shieldWrap.style.display = 'block';
+    const sm = shieldMax();
+    document.getElementById('shield-txt').textContent = `${Math.ceil(player.shield)}/${sm}`;
+    document.getElementById('shield-bar').style.width = `${Math.max(0,player.shield/sm*100)}%`;
+  } else {
+    shieldRow.style.display = 'none';
+    shieldWrap.style.display = 'none';
+  }
+
+  const em = energyMax();
+  const epct = player.energy/em*100;
+  document.getElementById('energy-txt').textContent = energyCharging
+    ? `${Math.ceil(player.energy)}/${em} ⚡`
+    : `${Math.ceil(player.energy)}/${em}`;
+  document.getElementById('energy-bar').style.width = `${Math.max(0,epct)}%`;
+  document.getElementById('energy-bar').classList.toggle('low', epct < 20);
+  document.getElementById('energy-bar').classList.toggle('charging', energyCharging);
+
+  const cc = cargoCapacity(), cu = cargoUsed();
+  document.getElementById('cargo-txt').textContent = `${cu}/${cc}`;
+  document.getElementById('cargo-bar').style.width = `${Math.min(100,cu/cc*100)}%`;
+
+  const gasTankRow = document.getElementById('gas-tank-row');
+  if(player.hasRamScoop){
+    gasTankRow.style.display = 'block';
+    const gc = gasTankCapacity(), gu = gasUsed();
+    document.getElementById('gas-tank-txt').textContent = `${gu}/${gc}`;
+    document.getElementById('gas-tank-bar').style.width = `${gc>0?Math.min(100,gu/gc*100):0}%`;
+  } else {
+    gasTankRow.style.display = 'none';
+  }
+
+  const need = xpToNext(player.level);
+  document.getElementById('lvl-badge').textContent = player.level;
+  document.getElementById('xp-txt').textContent = `${Math.floor(player.xp)}/${need}`;
+  document.getElementById('xp-bar').style.width = `${Math.min(100,player.xp/need*100)}%`;
+
+  document.getElementById('credits-txt').textContent = Math.floor(player.credits).toLocaleString();
+
+  const bountyRow = document.getElementById('frigate-bounty-row');
+  if(player.nebulaQuestAccepted && player.frigatesKilled < RAM_SCOOP_UNLOCK_FRIGATES){
+    bountyRow.style.display = 'block';
+    document.getElementById('frigate-bounty-txt').textContent = `${player.frigatesKilled}/${RAM_SCOOP_UNLOCK_FRIGATES}`;
+    document.getElementById('frigate-bounty-bar').style.width = `${Math.min(100, player.frigatesKilled/RAM_SCOOP_UNLOCK_FRIGATES*100)}%`;
+  } else {
+    bountyRow.style.display = 'none';
+  }
+  document.getElementById('tractor-hint').style.display = (player.tractorLevel>0||player.hasRamScoop) ? 'inline' : 'none';
+  if(player.tractorLevel>0 && player.hasRamScoop){
+    document.getElementById('tractor-hint-txt').textContent = 'tractor beam / ram scoop';
+  } else if(player.hasRamScoop){
+    document.getElementById('tractor-hint-txt').textContent = 'ram scoop';
+  } else {
+    document.getElementById('tractor-hint-txt').textContent = 'tractor beam';
+  }
+  document.getElementById('missile-hint').style.display = player.hasMissileLauncher ? 'inline' : 'none';
+  if(player.hasMissileLauncher){
+    document.getElementById('missile-ammo-txt').textContent = `(${player.missileAmmo} · DMM ${player.dmmAmmo})`;
+  }
+
+  renderCrewPanel();
+
+  const lockPanel = document.getElementById('hud-target-lock');
+
+  if(scoopTargets.length > 0 || tractorTargets.length > 0){
+    lockPanel.style.display = 'block';
+    const bar = document.getElementById('target-lock-bar');
+    if(scoopTargets.length > 0){
+      const cloud = scoopTargets[0];
+      const mat = MATERIALS[cloud.material];
+      document.getElementById('target-lock-label').textContent = `Scooping ${mat.name} — ${Math.round(cloud.volume)}/${Math.round(cloud.maxVolume)}`;
+      bar.style.width = `${Math.max(0,cloud.volume/cloud.maxVolume*100)}%`;
+      bar.style.background = `linear-gradient(90deg, ${mat.color}88, ${mat.color})`;
+    } else {
+      document.getElementById('target-lock-label').textContent = 'Tractoring cargo...';
+      bar.style.width = '100%';
+      bar.style.background = 'linear-gradient(90deg,#245b56,#4fe0d0)';
+    }
+    const proxEl = document.getElementById('target-lock-proximity');
+    if(proxEl){
+      const cu = cargoUsed(), cc = cargoCapacity();
+      let line = `Cargo: ${cu}/${cc}`;
+      if(player.hasRamScoop) line += ` · Gas: ${gasUsed()}/${gasTankCapacity()}`;
+      proxEl.textContent = line;
+      proxEl.style.color = 'var(--text-dim)';
+    }
+    return;
+  }
+
+  let effTarget = null, effType = null, showProximity = false;
+  if(firing && laserTarget){
+    effTarget = laserTarget; effType = laserTargetType; showProximity = true;
+  } else if(missileTrackTimer > 0 && missileTrackTarget){
+    if(pirates.indexOf(missileTrackTarget) >= 0){
+      effTarget = missileTrackTarget; effType = 'pirate'; showProximity = false;
+    } else if(asteroids.indexOf(missileTrackTarget) >= 0){
+      effTarget = missileTrackTarget; effType = 'asteroid'; showProximity = false;
+    }
+  }
+  if(effTarget){
+    lockPanel.style.display = 'block';
+    const hpPct = Math.max(0, effTarget.hp/effTarget.maxHp*100);
+    let label, barColor, barPct = hpPct;
+    if(effType==='pirate'){
+      if(effTarget.isFrigate || effTarget.isCorvette){
+        const shipName = effTarget.isCorvette ? 'Corvette' : 'Frigate';
+        label = `${shipName} — Shield ${Math.max(0,Math.ceil(effTarget.shield))}/${effTarget.shieldMax} · Hull ${Math.max(0,Math.ceil(effTarget.hp))}/${effTarget.maxHp}`;
+        if(effTarget.shield>0){
+          barColor = 'linear-gradient(90deg,#5b2d8f,#a855f7)';
+          barPct = Math.max(0,effTarget.shield/effTarget.shieldMax*100);
+        } else {
+          barColor = 'linear-gradient(90deg,#7a2030,#ff6a3d)';
+          barPct = hpPct;
+        }
+      } else {
+        label = `Pirate — ${Math.max(0,Math.ceil(effTarget.hp))}/${effTarget.maxHp} HP`;
+        barColor = 'linear-gradient(90deg,#7a2030,#e0546b)';
+      }
+    } else if(effTarget.material){
+      const mat = MATERIALS[effTarget.material];
+      label = `${mat.name} — ${Math.max(0,Math.ceil(effTarget.hp))}/${effTarget.maxHp} HP`;
+      barColor = `linear-gradient(90deg, ${mat.color}, ${mat.color})`;
+    } else {
+      label = `Unidentified Rock — ${Math.max(0,Math.ceil(effTarget.hp))}/${effTarget.maxHp} HP`;
+      barColor = 'linear-gradient(90deg,#5b6270,#818a97)';
+    }
+    document.getElementById('target-lock-label').textContent = label;
+    const bar = document.getElementById('target-lock-bar');
+    bar.style.width = `${barPct}%`;
+    bar.style.background = barColor;
+
+    const proxEl = document.getElementById('target-lock-proximity');
+    if(proxEl){
+      if(!showProximity){
+        proxEl.textContent = 'Missile inbound';
+        proxEl.style.color = 'var(--amber)';
+      } else {
+        const proxPct = Math.round((laserProximityMult-1)*100);
+        if(proxPct > 2){
+          proxEl.textContent = `+${proxPct}% dmg — close range`;
+          proxEl.style.color = 'var(--amber)';
+        } else if(proxPct < -2){
+          proxEl.textContent = `${proxPct}% dmg — long range`;
+          proxEl.style.color = 'var(--text-dim)';
+        } else {
+          proxEl.textContent = 'Neutral range';
+          proxEl.style.color = 'var(--text-dim)';
+        }
+      }
+    }
+  } else {
+    lockPanel.style.display = 'none';
+  }
+}
+
+function renderCrewPanel(){
+  const el = document.getElementById('crew-panel');
+  el.innerHTML = '';
+  for(let i=0;i<MAX_CREW;i++){
+    const c = crew[i];
+    if(c){
+      const need = xpToNext(c.level);
+      const div = document.createElement('div');
+      div.className = 'crew-card';
+      div.innerHTML = `<div class="name">${c.name} <span class="lvl">Lv${c.level}</span></div>
+        <div class="role">${ROLES[c.role].name}</div>
+        <div class="crew-mini-bar"><div class="fill" style="width:${Math.min(100,c.xp/need*100)}%"></div></div>`;
+      el.appendChild(div);
+    } else {
+      const div = document.createElement('div');
+      div.className = 'empty-slot';
+      div.textContent = 'Vacant berth — hire at station';
+      el.appendChild(div);
+    }
+  }
+}
+
+/* ============================= STATION UI ============================= */
+function updateStationCredits(){
+  const el = document.getElementById('station-credits-txt');
+  if(el) el.textContent = Math.floor(player.credits).toLocaleString();
+}
+function openStation(){
+  document.getElementById('station-overlay').classList.add('open');
+  renderSellTab();
+  renderUpgradesTab();
+  renderCrewTab();
+  renderFactionTab();
+  updateStationCredits();
+}
+function closeStation(){
+  document.getElementById('station-overlay').classList.remove('open');
+  if(docked) sfxUndock();
+  docked = false;
+}
+
+function openOutpost(){
+  document.getElementById('outpost-overlay').classList.add('open');
+  renderOutpostSell();
+  renderOutpostMissiles();
+  updateOutpostCredits();
+}
+function closeOutpost(){
+  document.getElementById('outpost-overlay').classList.remove('open');
+  if(docked) sfxUndock();
+  docked = false;
+}
+
+function toggleManifest(){
+  manifestOpen = !manifestOpen;
+  const el = document.getElementById('manifest-overlay');
+  if(manifestOpen){
+    el.classList.add('open');
+    renderManifest();
+  } else {
+    el.classList.remove('open');
+  }
+}
+function closeManifest(){
+  manifestOpen = false;
+  document.getElementById('manifest-overlay').classList.remove('open');
+}
+function renderManifest(){
+  const rowsEl = document.getElementById('manifest-rows');
+  const totalEl = document.getElementById('manifest-total');
+  const entries = MAT_KEYS.filter(k=>player.cargo[k]>0);
+  if(entries.length===0){
+    rowsEl.innerHTML = '<div class="empty-note">Cargo hold is empty.</div>';
+    totalEl.textContent = '';
+    return;
+  }
+  const batches = [10,20,50,100];
+  let rows = '';
+  entries.forEach(k=>{
+    const qty = player.cargo[k];
+    const mat = MATERIALS[k];
+    const weight = qty * (mat.cargoWeight||1);
+    rows += `<div class="cargo-row">
+      <span class="cargo-name"><span class="swatch" style="background:${mat.color}"></span>${mat.name} <span style="color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:10px;">(${mat.symbol})</span></span>
+      <span class="cargo-qty">×${qty}</span>
+      <span class="cargo-val mono">${weight} slot${weight!==1?'s':''}</span>
+    </div>`;
+    // smelting — metal ores only, and only once the Smelter module is installed
+    if(player.hasSmelter && SMELTABLE_KEYS.includes(k) && qty >= SMELT_RATIO){
+      const btns = batches.map(b=>{
+        const enabled = qty >= b;
+        return `<button class="upgrade-btn" style="padding:4px 9px;font-size:10px;margin-left:6px;" ${enabled?'':'disabled'} onclick="smeltAndRefresh('${k}',${b})">${b}</button>`;
+      }).join('');
+      rows += `<div style="display:flex;justify-content:flex-end;align-items:center;margin:-4px 0 10px;padding-right:2px;">
+        <span style="font-size:10px;color:var(--text-dim);margin-right:2px;">Smelt →</span>${btns}
+      </div>`;
+    }
+  });
+  rowsEl.innerHTML = rows;
+  const used = cargoUsed(), cap = cargoCapacity();
+  let totalText = `Cargo Hold: ${used} / ${cap}`;
+  if(player.hasRamScoop){
+    totalText += ` · Gas Tank: ${gasUsed()} / ${gasTankCapacity()}`;
+  }
+  if(!player.hasSmelter){
+    totalText += player.level >= SMELTER_UNLOCK_LEVEL
+      ? ' · Smelter available at the station'
+      : ` · Smelter unlocks at Level ${SMELTER_UNLOCK_LEVEL}`;
+  }
+  totalEl.textContent = totalText;
+}
+function updateOutpostCredits(){
+  const el = document.getElementById('outpost-credits-txt');
+  if(el) el.textContent = Math.floor(player.credits).toLocaleString();
+}
+function renderOutpostSell(){
+  const el = document.getElementById('outpost-sell');
+  const entries = MAT_KEYS.filter(k=>player.cargo[k]>0);
+  let total = 0;
+  if(entries.length===0){
+    el.innerHTML = '<div class="empty-note">Cargo hold is empty.</div>';
+    return;
+  }
+  let rows = '';
+  entries.forEach(k=>{
+    const qty = player.cargo[k];
+    const mat = MATERIALS[k];
+    const val = Math.round(qty*effectivePrice(k)*OUTPOST_SELL_MULT);
+    total += val;
+    rows += `<div class="cargo-row">
+      <span class="cargo-name"><span class="swatch" style="background:${mat.color}"></span>${mat.name} <span style="color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:10px;">(${mat.symbol})</span></span>
+      <span class="cargo-qty">×${qty}</span>
+      <span class="cargo-val mono">${val.toLocaleString()} cr</span>
+    </div>`;
+  });
+  el.innerHTML = rows + `<button class="sell-btn" style="background:none;border-color:var(--amber);color:var(--amber);" onclick="sellAllOutpost()">Sell All — ${total.toLocaleString()} cr</button>`;
+}
+function sellAllOutpost(){
+  let total = 0, units = 0;
+  MAT_KEYS.forEach(k=>{
+    if(player.cargo[k]>0){
+      total += Math.round(player.cargo[k]*effectivePrice(k)*OUTPOST_SELL_MULT);
+      units += player.cargo[k];
+      player.cargo[k] = 0;
+    }
+  });
+  if(total>0){
+    player.credits += total;
+    grantXp(total*0.08);
+    toast(`Fenced ${units} units for ${total.toLocaleString()} credits`);
+    sfxSell();
+  }
+  renderOutpostSell();
+  updateHUD();
+  updateOutpostCredits();
+  saveGame();
+}
+function renderOutpostMissiles(){
+  const el = document.getElementById('outpost-missiles');
+  if(!player.hasMissileLauncher){
+    el.innerHTML = '';
+    return;
+  }
+  const shipAffordable = player.credits >= OUTPOST_MISSILE_COST && canAddShipMissiles(MISSILE_BATCH_SIZE);
+  const dmmAffordable = player.credits >= OUTPOST_DMM_COST && canAddDMM(1);
+  el.innerHTML = `<div class="label-row" style="margin-bottom:8px;">Missile Resupply <span style="color:var(--text-dim);text-transform:none;">(marked up out here)</span></div>
+    <div class="upgrade-card" style="border-color:#4a3220;">
+      <div class="upgrade-info">
+        <div class="u-name">Ship Missiles</div>
+        <div class="u-desc">On hand: ${player.missileAmmo}</div>
+      </div>
+      <button class="upgrade-btn" style="border-color:var(--amber);color:var(--amber);" ${shipAffordable?'':'disabled'}
+        onmousedown="startHoldRepeat(buyMissilesOutpost)" ontouchstart="startHoldRepeat(buyMissilesOutpost)">${MISSILE_BATCH_SIZE} for ${OUTPOST_MISSILE_COST.toLocaleString()} cr</button>
+    </div>
+    <div class="upgrade-card" style="border-color:#4a3220;margin-top:10px;">
+      <div class="upgrade-info">
+        <div class="u-name">Dark Matter Missile <span style="color:var(--text-dim);font-size:11px;">rare stock</span></div>
+        <div class="u-desc">Deals ${(DMM_DAMAGE_PCT*100).toFixed(0)}% of a Dark Matter fragment's HP per hit. Takes 10 bay slots — max ${DMM_MAX_COUNT} carried.</div>
+        <div class="u-lvl">On hand: ${player.dmmAmmo} / ${DMM_MAX_COUNT}</div>
+      </div>
+      <button class="upgrade-btn" style="border-color:#a855f7;color:#d9b8ff;" ${dmmAffordable?'':'disabled'}
+        onmousedown="startHoldRepeat(buyDMMOutpost)" ontouchstart="startHoldRepeat(buyDMMOutpost)">1 for ${OUTPOST_DMM_COST.toLocaleString()} cr</button>
+    </div>`;
+}
+function buyMissilesOutpost(){
+  if(!player.hasMissileLauncher) return;
+  if(player.credits < OUTPOST_MISSILE_COST) return;
+  if(!canAddShipMissiles(MISSILE_BATCH_SIZE)) return;
+  player.credits -= OUTPOST_MISSILE_COST;
+  player.missileAmmo += MISSILE_BATCH_SIZE;
+  toast(`Loaded ${MISSILE_BATCH_SIZE} missiles`); sfxClick();
+  renderOutpostMissiles();
+  updateHUD();
+  updateOutpostCredits();
+  saveGame();
+}
+function buyDMMOutpost(){
+  if(!player.hasMissileLauncher) return;
+  if(player.credits < OUTPOST_DMM_COST) return;
+  if(!canAddDMM(1)) return;
+  player.credits -= OUTPOST_DMM_COST;
+  player.dmmAmmo++;
+  toast('Loaded 1 Dark Matter Missile', 'levelup'); sfxClick();
+  renderOutpostMissiles();
+  updateHUD();
+  updateOutpostCredits();
+  saveGame();
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+function effectivePrice(matKey){
+  const mat = MATERIALS[matKey];
+  let price = mat.price;
+  if(mat.ingot) price *= (1 + roleBonusPct('metallurgist'));
+  return price;
+}
+function renderSellTab(){
+  const el = document.getElementById('tab-sell');
+  const entries = MAT_KEYS.filter(k=>player.cargo[k]>0);
+  let total = 0;
+  if(entries.length===0){
+    el.innerHTML = '<div class="empty-note">Cargo hold is empty. Go mine some asteroids.</div>';
+    return;
+  }
+  let rows = '';
+  entries.forEach(k=>{
+    const qty = player.cargo[k];
+    const mat = MATERIALS[k];
+    const val = Math.round(qty*effectivePrice(k));
+    total += val;
+    rows += `<div class="cargo-row">
+      <span class="cargo-name"><span class="swatch" style="background:${mat.color}"></span>${mat.name} <span style="color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:10px;">(${mat.symbol})</span></span>
+      <span class="cargo-qty">×${qty}</span>
+      <span class="cargo-val mono">${val.toLocaleString()} cr</span>
+    </div>`;
+  });
+  el.innerHTML = rows + `<button class="sell-btn" onclick="sellAll()">Sell All — ${total.toLocaleString()} cr</button>`;
+}
+function smeltAndRefresh(oreKey, amount){
+  if(smeltOre(oreKey, amount)){
+    renderManifest();
+    updateHUD();
+    saveGame();
+  }
+}
+function sellAll(){
+  let total = 0, units = 0;
+  MAT_KEYS.forEach(k=>{
+    if(player.cargo[k]>0){ total += Math.round(player.cargo[k]*effectivePrice(k)); units += player.cargo[k]; player.cargo[k]=0; }
+  });
+  if(total>0){
+    player.credits += total;
+    grantXp(total*0.08);
+    toast(`Sold ${units} units for ${total.toLocaleString()} credits`);
+    sfxSell();
+  }
+  renderSellTab();
+  renderUpgradesTab();
+  updateHUD();
+  updateStationCredits();
+  saveGame();
+}
+
+const UPGRADES = [
+  {key:'cargoLevel', name:'Cargo Expansion', desc:'Adds hold space for more ore per trip.',
+    cost:l=>Math.round(180*Math.pow(l,1.55)), stat:()=>`Capacity: ${cargoCapacity()} units`},
+  {key:'laserLevel', name:'Mining Laser', desc:'Increases laser damage output. Damage scales with proximity — closer shots hit harder, long-range shots fall off.',
+    cost:l=>Math.round(220*Math.pow(l,1.6)), stat:()=>`Damage: ${laserDamage().toFixed(1)}/s`},
+  {key:'engineLevel', name:'Engine Core', desc:'Improves top speed and maneuvering.',
+    cost:l=>Math.round(200*Math.pow(l,1.55)), stat:()=>`Top speed: ${maxSpeed().toFixed(0)}`},
+  {key:'hullLevel', name:'Hull Plating', desc:'Raises maximum hull integrity.',
+    cost:l=>Math.round(190*Math.pow(l,1.5)), stat:()=>`Max hull: ${hullMax()}`},
+  {key:'energyLevel', name:'Energy Cell', desc:'Expands energy capacity and passive recharge rate for your laser and tractor beam.',
+    cost:l=>Math.round(210*Math.pow(l,1.55)), stat:()=>`Capacity: ${energyMax()} · Regen: ${energyRegen().toFixed(1)}/s`},
+  {key:'tractorLevel', name:'Tractor Beam', maxLevel:()=> player.factionPerks.tractorOvercharge ? 6 : 4,
+    desc:l=> l===0 ? 'Installs a beam (hold SHIFT/CTRL) that pulls loose ore toward your ship.' : 'Increases beam range and pull strength.',
+    cost:l=>Math.round(260*Math.pow(l+1,1.55)),
+    stat:()=> player.tractorLevel===0 ? 'Not installed' : `Range: ${tractorRange()}m · Pull: ${tractorStrength()}`},
+  {key:'shieldLevel', name:'Deflector Shield', maxLevel:()=> player.factionPerks.shieldOvercharge ? 6 : 4,
+    desc:l=> l===0 ? 'Installs a regenerating shield that absorbs incoming damage before your hull.' : 'Increases shield capacity and regen rate.',
+    cost:l=>Math.round(240*Math.pow(l+1,1.55)),
+    stat:()=> player.shieldLevel===0 ? 'Not installed' : `Capacity: ${shieldMax()} · Regen: ${shieldRegenRate().toFixed(1)}/s`},
+  {key:'scannerLevel', name:'Mineral Scanner', maxLevel:2,
+    desc:l=> l===0 ? 'Composition stays unknown until a fragment is ground down to its smallest size. This module instantly reads out the element symbol (Fe, Au, Pt...) the moment it becomes identifiable, within scan range.' : 'Extends scan range to cover your entire viewscreen.',
+    cost:l=>Math.round(140*Math.pow(l+1,1.5)),
+    stat:()=> player.scannerLevel===0 ? 'Not installed' : (player.scannerLevel>=2 ? 'Range: full viewscreen' : 'Range: 700m')},
+];
+function resolveMaxLevel(u){ return typeof u.maxLevel === 'function' ? u.maxLevel() : u.maxLevel; }
+function upgradeCost(u, lvl){
+  let c = u.cost(lvl);
+  if(player.factionPerks && player.factionPerks.discountLicense) c = Math.round(c*0.9);
+  return c;
+}
+function renderUpgradesTab(){
+  const el = document.getElementById('tab-upgrades');
+  el.innerHTML = '';
+
+  // Missile Battery — launcher is a rare Frigate drop; ammo is salvaged from wrecks or bought at the fence
+  const missileCard = document.createElement('div');
+  missileCard.className = 'upgrade-card';
+  if(!player.hasMissileLauncher){
+    missileCard.innerHTML = `<div class="upgrade-info">
+        <div class="u-name">Missile Battery <span style="color:var(--text-dim);font-size:11px;">Not Installed</span></div>
+        <div class="u-desc">No launcher hardware. Salvage one from the wreckage of a destroyed Frigate out in the Deep Zone — it doesn't drop every time.</div>
+      </div>
+      <button class="upgrade-btn" disabled>Locked</button>`;
+  } else {
+    missileCard.innerHTML = `<div class="upgrade-info">
+        <div class="u-name">Missile Battery</div>
+        <div class="u-desc">Fire with Z — the launcher auto-detects the nearest threat and picks the right ordnance. Ammo is salvaged from destroyed ships or bought at the Black Market Relay in the Deep Zone — Ceres doesn't stock military hardware.</div>
+        <div class="u-lvl">Ship Missiles: ${player.missileAmmo} · Dark Matter Missiles: ${player.dmmAmmo} / ${DMM_MAX_COUNT}</div>
+        <div class="u-lvl">Damage: ${missileDamage().toFixed(0)} · DMM: ${(DMM_DAMAGE_PCT*100).toFixed(0)}% of target HP · Reload: ${missileCooldownTime().toFixed(1)}s</div>
+      </div>
+      <button class="upgrade-btn" disabled>Fence Only</button>`;
+  }
+  el.appendChild(missileCard);
+
+  // Smelter — level-gated ship module, converts raw ore into denser, more valuable ingots
+  if(player.level >= SMELTER_UNLOCK_LEVEL || player.hasSmelter){
+    const smelterCard = document.createElement('div');
+    smelterCard.className = 'upgrade-card';
+    if(!player.hasSmelter){
+      const canAfford = player.credits >= SMELTER_COST;
+      smelterCard.innerHTML = `<div class="upgrade-info">
+          <div class="u-name">Smelter <span style="color:var(--text-dim);font-size:11px;">Not Installed</span></div>
+          <div class="u-desc">Refines raw ore into ingots at 10:1 — 10 ore becomes 1 ingot, worth more and taking a fraction of the cargo space. Refine from the Cargo Manifest (I) once installed.</div>
+        </div>
+        <button class="upgrade-btn" ${canAfford?'':'disabled'} onclick="buySmelter()">${SMELTER_COST.toLocaleString()} cr</button>`;
+    } else {
+      smelterCard.innerHTML = `<div class="upgrade-info">
+          <div class="u-name">Smelter</div>
+          <div class="u-desc">Installed. Refine ore into ingots from the Cargo Manifest (I) — 10 raw ore becomes 1 ingot.</div>
+        </div>
+        <button class="upgrade-btn" disabled>Installed</button>`;
+    }
+    el.appendChild(smelterCard);
+  }
+
+  // Mule Bay — cargo hold for the Faction Escort, only useful once it's earned ore-collection at level 50
+  if(escort){
+    const muleCard = document.createElement('div');
+    muleCard.className = 'upgrade-card';
+    if(escort.level < ESCORT_COLLECT_LEVEL){
+      muleCard.innerHTML = `<div class="upgrade-info">
+          <div class="u-name">Mule Bay <span style="color:var(--text-dim);font-size:11px;">Locked</span></div>
+          <div class="u-desc">Gives your Faction Escort its own cargo hold so it can haul ore alongside you. Requires the escort to reach Level ${ESCORT_COLLECT_LEVEL} first — currently Level ${escort.level}.</div>
+        </div>
+        <button class="upgrade-btn" disabled>Locked</button>`;
+    } else {
+      const lvl = player.escortCargoLevel;
+      const cost = Math.round(220*Math.pow(lvl+1,1.5));
+      const canAfford = player.credits >= cost;
+      muleCard.innerHTML = `<div class="upgrade-info">
+          <div class="u-name">Mule Bay <span style="color:var(--text-dim);font-size:11px;">Lv ${lvl}</span></div>
+          <div class="u-desc">Your escort automatically mines, collects ore, and hands it off to you whenever it's nearby.</div>
+          <div class="u-lvl">Capacity: ${escortCargoCapacity()} units</div>
+        </div>
+        <button class="upgrade-btn" ${canAfford?'':'disabled'} onclick="buyMuleBay()">${cost.toLocaleString()} cr</button>`;
+    }
+    el.appendChild(muleCard);
+  }
+
+  // Ram Scoop — unlocked by a frigate-kill milestone, collects gas from Nebula clouds
+  if(player.frigatesKilled >= RAM_SCOOP_UNLOCK_FRIGATES || player.hasRamScoop){
+    const scoopCard = document.createElement('div');
+    scoopCard.className = 'upgrade-card';
+    if(!player.hasRamScoop){
+      const canAfford = player.credits >= RAM_SCOOP_COST;
+      scoopCard.innerHTML = `<div class="upgrade-info">
+          <div class="u-name">Ram Scoop <span style="color:var(--text-dim);font-size:11px;">Not Installed</span></div>
+          <div class="u-desc">Mounts twin collector pylons to your hull. Hold SHIFT/CTRL near a gas cloud in the Nebula to draw gas into your hold — same control as the Tractor Beam.</div>
+        </div>
+        <button class="upgrade-btn" ${canAfford?'':'disabled'} onclick="buyRamScoop()">${RAM_SCOOP_COST.toLocaleString()} cr</button>`;
+    } else {
+      scoopCard.innerHTML = `<div class="upgrade-info">
+          <div class="u-name">Ram Scoop</div>
+          <div class="u-desc">Installed. Hold SHIFT/CTRL near a gas cloud in the Nebula to extract gas.</div>
+        </div>
+        <button class="upgrade-btn" disabled>Installed</button>`;
+    }
+    el.appendChild(scoopCard);
+  } else {
+    const lockedCard = document.createElement('div');
+    lockedCard.className = 'upgrade-card';
+    lockedCard.innerHTML = `<div class="upgrade-info">
+        <div class="u-name">Ram Scoop <span style="color:var(--text-dim);font-size:11px;">Locked</span></div>
+        <div class="u-desc">Frigate salvage patterns need decoding before this hardware can be installed. Destroy ${RAM_SCOOP_UNLOCK_FRIGATES} Frigates to unlock it — and a new Stargate.</div>
+        <div class="u-lvl">Frigates destroyed: ${player.frigatesKilled} / ${RAM_SCOOP_UNLOCK_FRIGATES}</div>
+      </div>
+      <button class="upgrade-btn" disabled>Locked</button>`;
+    el.appendChild(lockedCard);
+  }
+
+  // Gas Tank — separate storage pool from the main cargo hold, only relevant once Ram Scoop is installed
+  if(player.hasRamScoop){
+    const tankCard = document.createElement('div');
+    tankCard.className = 'upgrade-card';
+    const lvl = player.gasTankLevel;
+    const cost = Math.round(150*Math.pow(lvl+1,1.5));
+    const canAfford = player.credits >= cost;
+    tankCard.innerHTML = `<div class="upgrade-info">
+        <div class="u-name">Gas Tank <span style="color:var(--text-dim);font-size:11px;">Lv ${lvl}</span></div>
+        <div class="u-desc">A dedicated tank for scooped gas, entirely separate from your ore/gem cargo hold — filling one never eats into the other.</div>
+        <div class="u-lvl">Capacity: ${gasTankCapacity()} units</div>
+      </div>
+      <button class="upgrade-btn" ${canAfford?'':'disabled'} onclick="buyGasTank()">${cost.toLocaleString()} cr</button>`;
+    el.appendChild(tankCard);
+  }
+
+  UPGRADES.forEach(u=>{
+    const lvl = player[u.key];
+    const maxLevelVal = resolveMaxLevel(u);
+    const maxed = maxLevelVal && lvl >= maxLevelVal;
+    const cost = maxed ? null : upgradeCost(u, lvl);
+    const canAfford = !maxed && player.credits >= cost;
+    const desc = typeof u.desc === 'function' ? u.desc(lvl) : u.desc;
+    const card = document.createElement('div');
+    card.className = 'upgrade-card';
+    card.innerHTML = `<div class="upgrade-info">
+        <div class="u-name">${u.name} <span style="color:var(--text-dim);font-size:11px;">Lv ${lvl}${maxLevelVal?('/'+maxLevelVal):''}</span></div>
+        <div class="u-desc">${desc}</div>
+        <div class="u-lvl">${u.stat()}</div>
+      </div>
+      <button class="upgrade-btn" ${(canAfford&&!maxed)?'':'disabled'} onclick="buyUpgrade('${u.key}')">${maxed?'Maxed':cost.toLocaleString()+' cr'}</button>`;
+    el.appendChild(card);
+  });
+}
+function buyUpgrade(key){
+  const u = UPGRADES.find(x=>x.key===key);
+  const maxLevelVal = resolveMaxLevel(u);
+  if(maxLevelVal && player[key] >= maxLevelVal) return;
+  const cost = upgradeCost(u, player[key]);
+  if(player.credits >= cost){
+    player.credits -= cost;
+    player[key]++;
+    if(key==='hullLevel') player.hull = hullMax();
+    if(key==='energyLevel') player.energy = energyMax();
+    if(key==='shieldLevel') player.shield = shieldMax();
+    toast(`${u.name} upgraded to level ${player[key]}`);
+    sfxClick();
+    renderUpgradesTab();
+    updateHUD();
+    updateStationCredits();
+    saveGame();
+  }
+}
+
+function buySmelter(){
+  if(player.hasSmelter) return;
+  if(player.credits < SMELTER_COST) return;
+  player.credits -= SMELTER_COST;
+  player.hasSmelter = true;
+  toast('Smelter installed — refine ore into ingots from the Cargo Manifest (I).', 'levelup');
+  sfxLevelUp();
+  renderUpgradesTab();
+  updateStationCredits();
+  saveGame();
+}
+function buyMuleBay(){
+  if(!escort || escort.level < ESCORT_COLLECT_LEVEL) return;
+  const lvl = player.escortCargoLevel;
+  const cost = Math.round(220*Math.pow(lvl+1,1.5));
+  if(player.credits < cost) return;
+  player.credits -= cost;
+  player.escortCargoLevel++;
+  toast(`Mule Bay upgraded to level ${player.escortCargoLevel}`);
+  sfxClick();
+  renderUpgradesTab();
+  updateStationCredits();
+  saveGame();
+}
+function buyRamScoop(){
+  if(player.hasRamScoop) return;
+  if(player.frigatesKilled < RAM_SCOOP_UNLOCK_FRIGATES) return;
+  if(player.credits < RAM_SCOOP_COST) return;
+  player.credits -= RAM_SCOOP_COST;
+  player.hasRamScoop = true;
+  if(player.gasTankLevel < 1) player.gasTankLevel = 1; // ships with a starter tank so it works out of the box
+  toast('Ram Scoop installed — hold SHIFT/CTRL near a gas cloud in the Nebula to collect.', 'levelup');
+  sfxLevelUp();
+  renderUpgradesTab();
+  updateStationCredits();
+  saveGame();
+}
+
+function buyGasTank(){
+  if(!player.hasRamScoop) return;
+  const cost = Math.round(150*Math.pow(player.gasTankLevel+1,1.5));
+  if(player.credits < cost) return;
+  player.credits -= cost;
+  player.gasTankLevel++;
+  toast(`Gas Tank upgraded to level ${player.gasTankLevel}`);
+  sfxClick();
+  renderUpgradesTab();
+  updateStationCredits();
+  saveGame();
+}
+
+function renderCrewTab(){
+  const el = document.getElementById('tab-crew');
+  let html = '';
+  if(escort){
+    const need = escortXpToNext(escort.level);
+    const pct = Math.min(100, escort.xp/need*100);
+    const escortUsed = Object.values(escort.cargo).reduce((s,v)=>s+v,0);
+    html += `<div class="upgrade-card" style="flex-direction:column;align-items:stretch;margin-bottom:18px;">
+      <div class="u-name" style="margin-bottom:4px;">Faction Escort <span style="color:var(--cyan);font-size:11px;">Lv ${escort.level}</span></div>
+      <div class="barwrap" style="margin-bottom:4px;"><div class="bar" style="width:${pct}%;background:linear-gradient(90deg,#245b56,#4fe0d0);"></div></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">${Math.floor(escort.xp)} / ${need} XP — gains XP alongside you automatically</div>
+      <div style="font-size:11px;color:${escort.level>=ESCORT_MINE_LEVEL?'var(--cyan)':'var(--text-dim)'};">${escort.level>=ESCORT_MINE_LEVEL?'✓':'○'} Mines nearby asteroids (Lv ${ESCORT_MINE_LEVEL})</div>
+      <div style="font-size:11px;color:${escort.level>=ESCORT_COLLECT_LEVEL?'var(--cyan)':'var(--text-dim)'};">${escort.level>=ESCORT_COLLECT_LEVEL?'✓':'○'} Collects ore, needs a Mule Bay (Lv ${ESCORT_COLLECT_LEVEL})</div>
+      ${escortCargoCapacity()>0?`<div style="font-size:11px;color:var(--amber);margin-top:6px;">Mule Bay cargo: ${escortUsed} / ${escortCargoCapacity()}</div>`:''}
+    </div>`;
+  }
+  if(crew.length>0){
+    html += '<div style="margin-bottom:18px;">';
+    crew.forEach(c=>{
+      html += `<div class="crew-list-item">
+        <div class="crew-detail">
+          <div class="c-name">${c.name} <span style="color:var(--cyan);font-size:11px;">Lv${c.level}</span></div>
+          <div class="c-role">${ROLES[c.role].name}</div>
+          <div class="c-perk">${ROLES[c.role].desc} — currently +${(ROLES[c.role].perkPer*c.level)}%</div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  if(crew.length < MAX_CREW){
+    const cost = Math.round(400 * Math.pow(crew.length+1, 1.5));
+    const roleKeys = Object.keys(ROLES);
+    const role = roleKeys[crew.length % roleKeys.length];
+    const name = CREW_NAME_POOL[Math.floor(Math.random()*CREW_NAME_POOL.length)];
+    if(!window._pendingHire || window._pendingHireSlot !== crew.length){
+      window._pendingHire = {name, role};
+      window._pendingHireSlot = crew.length;
+    }
+    const hire = window._pendingHire;
+    const canAfford = player.credits >= cost;
+    html += `<div class="crew-hire-card">
+      <div class="crew-detail">
+        <div class="c-name">${hire.name}</div>
+        <div class="c-role">${ROLES[hire.role].name}</div>
+        <div class="c-perk">${ROLES[hire.role].desc}</div>
+      </div>
+      <button class="hire-btn" ${canAfford?'':'disabled'} onclick="hireCrew()">Hire — ${cost.toLocaleString()} cr</button>
+    </div>`;
+  } else {
+    html += '<div class="empty-note">All berths full. Your crew is complete.</div>';
+  }
+  el.innerHTML = html;
+}
+function hireCrew(){
+  if(crew.length >= MAX_CREW) return;
+  const cost = Math.round(400 * Math.pow(crew.length+1, 1.5));
+  if(player.credits < cost) return;
+  const hire = window._pendingHire;
+  player.credits -= cost;
+  crew.push({name:hire.name, role:hire.role, level:1, xp:0});
+  window._pendingHire = null;
+  toast(`${hire.name} joined your crew as ${ROLES[hire.role].name}`);
+  sfxLevelUp();
+  renderCrewTab();
+  renderUpgradesTab();
+  updateHUD();
+  updateStationCredits();
+  saveGame();
+}
+
+function renderFactionTab(){
+  const el = document.getElementById('tab-faction');
+  if(player.level < FACTION_UNLOCK_LEVEL){
+    el.innerHTML = `<div class="empty-note">Faction Relations unlock at Captain Level ${FACTION_UNLOCK_LEVEL}. Keep mining, selling, and leveling up to gain access.<br><br>Currently Level ${player.level}.</div>`;
+    return;
+  }
+  const rankIdx = factionRankIndex();
+  const rank = FACTION_RANKS[rankIdx];
+  const nextRank = FACTION_RANKS[rankIdx+1];
+  const goldQty = player.cargo['gold']||0;
+
+  let html = '';
+
+  // Frontier Trial quest tracker
+  if(quest.completed){
+    html += `<div class="upgrade-card" style="border-color:#a855f7;">
+      <div class="upgrade-info">
+        <div class="u-name" style="color:#d9b8ff;">Frontier Trial — Complete</div>
+        <div class="u-desc">A Stargate is active in the far reaches of the system. Fly out and press E near it to warp into the Deep Zone.</div>
+      </div>
+    </div>`;
+  } else {
+    const rankDone = rankIdx >= QUEST_RANK_TARGET;
+    html += `<div class="upgrade-card" style="flex-direction:column;align-items:stretch;">
+      <div class="u-name" style="margin-bottom:8px;">Frontier Trial</div>
+      <div class="u-desc" style="margin-bottom:10px;">Prove yourself to the faction to unlock a Stargate into uncharted deep space.</div>
+      <div style="font-size:12px;color:${quest.piratesKilled>=QUEST_PIRATE_TARGET?'var(--cyan)':'var(--text-dim)'};margin-bottom:4px;">
+        ${quest.piratesKilled>=QUEST_PIRATE_TARGET?'✓':'○'} Destroy pirates — ${Math.min(quest.piratesKilled,QUEST_PIRATE_TARGET)}/${QUEST_PIRATE_TARGET}
+      </div>
+      <div style="font-size:12px;color:${quest.darkMatterCollected>=QUEST_DARKMATTER_TARGET?'var(--cyan)':'var(--text-dim)'};margin-bottom:4px;">
+        ${quest.darkMatterCollected>=QUEST_DARKMATTER_TARGET?'✓':'○'} Collect Dark Matter — ${Math.min(quest.darkMatterCollected,QUEST_DARKMATTER_TARGET)}/${QUEST_DARKMATTER_TARGET}
+      </div>
+      <div style="font-size:12px;color:${rankDone?'var(--cyan)':'var(--text-dim)'};">
+        ${rankDone?'✓':'○'} Reach ${FACTION_RANKS[QUEST_RANK_TARGET].name} rank
+      </div>
+    </div>`;
+  }
+
+  // Frigate Bounty quest tracker
+  if(player.frigatesKilled >= RAM_SCOOP_UNLOCK_FRIGATES){
+    html += `<div class="upgrade-card" style="border-color:#f2a154;margin-top:12px;">
+      <div class="upgrade-info">
+        <div class="u-name" style="color:#ffb27a;">Frigate Bounty — Complete</div>
+        <div class="u-desc">Ram Scoop equipment is available at Ceres, and a new Stargate is active in the Deep Zone leading to the Nebula.</div>
+      </div>
+    </div>`;
+  } else if(player.nebulaQuestAccepted){
+    const pct = Math.min(100, player.frigatesKilled/RAM_SCOOP_UNLOCK_FRIGATES*100);
+    html += `<div class="upgrade-card" style="flex-direction:column;align-items:stretch;border-color:#f2a154;margin-top:12px;">
+      <div class="u-name" style="margin-bottom:8px;">Frigate Bounty <span style="color:var(--text-dim);font-size:11px;">In Progress</span></div>
+      <div class="u-desc" style="margin-bottom:10px;">Destroy Frigates in the Deep Zone to prove your ship worthy of ram-scoop hardware — and to draw a new Stargate out of hiding.</div>
+      <div class="barwrap"><div class="bar" style="width:${pct}%;background:linear-gradient(90deg,#7a2030,#ff6a3d);"></div></div>
+      <div style="font-size:12px;color:var(--amber);">${player.frigatesKilled} / ${RAM_SCOOP_UNLOCK_FRIGATES} Frigates destroyed</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Tracked live in your HUD.</div>
+    </div>`;
+  } else {
+    html += `<div class="upgrade-card" style="margin-top:12px;">
+      <div class="upgrade-info">
+        <div class="u-name">Frigate Bounty</div>
+        <div class="u-desc">A standing contract to hunt Frigates in the Deep Zone. Accept it to unlock Ram Scoop hardware and a new Stargate at ${RAM_SCOOP_UNLOCK_FRIGATES} kills, tracked live in your HUD.</div>
+      </div>
+      <button class="upgrade-btn" onclick="acceptNebulaQuest()">Accept Contract</button>
+    </div>`;
+  }
+
+  html += `<div style="margin-bottom:20px;margin-top:18px;">
+    <div class="label-row"><span>Faction Rank</span><span class="mono" style="color:var(--cyan);">${rank.name}</span></div>`;
+  if(nextRank){
+    const pct = Math.min(100, (player.factionPointsTotal-rank.threshold)/(nextRank.threshold-rank.threshold)*100);
+    html += `<div class="barwrap"><div class="bar" style="width:${pct}%;background:linear-gradient(90deg,#245b56,#4fe0d0);"></div></div>
+    <div style="font-size:11px;color:var(--text-dim);">${player.factionPointsTotal} / ${nextRank.threshold} lifetime FP to reach ${nextRank.name}</div>`;
+  } else {
+    html += `<div style="font-size:11px;color:var(--gold);margin-top:4px;">Maximum rank achieved.</div>`;
+  }
+  html += `<div style="margin-top:10px;font-size:13px;">Spendable Faction Points: <span class="mono" style="color:var(--amber);font-weight:600;">${player.factionPoints} FP</span></div>
+  </div>`;
+
+  html += `<div class="label-row" style="margin-bottom:8px;">Donate for Reputation</div>
+    <div class="upgrade-card">
+      <div class="upgrade-info">
+        <div class="u-name">Gold Ore Tribute</div>
+        <div class="u-desc">The faction values raw gold over credits — hand over your entire Gold Ore hold for reputation instead of selling it.</div>
+        <div class="u-lvl">In cargo: ${goldQty} Gold Ore · Rate: 15 FP per unit</div>
+      </div>
+      <button class="upgrade-btn" ${goldQty>0?'':'disabled'} onclick="donateGold()">Donate (+${goldQty*15} FP)</button>
+    </div>
+    <div class="upgrade-card">
+      <div class="upgrade-info">
+        <div class="u-name">Credit Contribution</div>
+        <div class="u-desc">Convert spare credits directly into reputation.</div>
+        <div class="u-lvl">Rate: 40 credits per FP</div>
+      </div>
+      <button class="upgrade-btn" ${player.credits>=500?'':'disabled'}
+        onmousedown="startHoldRepeat(donateCredits)" ontouchstart="startHoldRepeat(donateCredits)">Donate 500 CR (+12 FP) — hold to repeat</button>
+    </div>`;
+
+  html += `<div class="label-row" style="margin:18px 0 8px;">Faction Store</div>`;
+  FACTION_PERKS.forEach(perk=>{
+    const owned = player.factionPerks[perk.key];
+    const rankOk = rankIdx >= perk.rankReq;
+    const canAfford = player.factionPoints >= perk.fpCost;
+    let btnLabel = owned ? 'Owned' : (!rankOk ? `Req. ${FACTION_RANKS[perk.rankReq].name}` : `${perk.fpCost} FP`);
+    html += `<div class="upgrade-card">
+      <div class="upgrade-info">
+        <div class="u-name">${perk.name}</div>
+        <div class="u-desc">${perk.desc}</div>
+      </div>
+      <button class="upgrade-btn" ${(owned||!rankOk||!canAfford)?'disabled':''} onclick="buyFactionPerk('${perk.key}')">${btnLabel}</button>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+function donateGold(){
+  const qty = player.cargo['gold']||0;
+  if(qty<=0) return;
+  const fp = qty*15;
+  player.cargo['gold'] = 0;
+  player.factionPoints += fp;
+  player.factionPointsTotal += fp;
+  toast(`Donated ${qty} Gold Ore for ${fp} Faction Points`, 'levelup');
+  sfxClick();
+  checkQuestCompletion();
+  renderFactionTab();
+  renderSellTab();
+  updateHUD();
+  saveGame();
+}
+function donateCredits(){
+  const amount = 500, fpGain = 12;
+  if(player.credits < amount) return;
+  player.credits -= amount;
+  player.factionPoints += fpGain;
+  player.factionPointsTotal += fpGain;
+  toast(`Donated ${amount} credits for ${fpGain} Faction Points`);
+  sfxClick();
+  checkQuestCompletion();
+  renderFactionTab();
+  renderUpgradesTab();
+  updateStationCredits();
+  saveGame();
+}
+function buyFactionPerk(key){
+  const perk = FACTION_PERKS.find(p=>p.key===key);
+  if(!perk || player.factionPerks[key]) return;
+  if(factionRankIndex() < perk.rankReq) return;
+  if(player.factionPoints < perk.fpCost) return;
+  player.factionPoints -= perk.fpCost;
+  player.factionPerks[key] = true;
+  toast(`${perk.name} unlocked!`, 'levelup');
+  sfxLevelUp();
+  renderFactionTab();
+  renderUpgradesTab();
+  saveGame();
+}
+</script>
+
+</body>
+</html>
